@@ -8,6 +8,20 @@ local CACHE_TTL = 7 * 86400
 -- Total budget for the three racing upstream requests.
 local REQ_TIMEOUT = 5000 -- ms
 
+-- DMM FANZA affiliate API credentials.
+--
+-- These values are THIRD-PARTY credentials copied from the original TS worker
+-- (api_id "UrwskPfkqQ0DuVry2gYL" / affiliate_id "10278-996"). They are NOT owned
+-- by this project and may be revoked, rate-limited, or expired at any time by
+-- their owner or by DMM itself -- if that happens the "dmm" source will start
+-- failing (403 / empty result) and we fall back to javdatabase.
+--
+-- To make this source self-sufficient, register your own DMM affiliate account
+-- at https://affiliate.dmm.com/ and replace these two constants with keys from
+-- your account. (A future refactor could surface them via config/env vars.)
+local DMM_API_ID = "UrwskPfkqQ0DuVry2gYL"
+local DMM_AFFILIATE_ID = "10278-996"
+
 -- Three independent upstream sources. Each returns (url, source) on success.
 -- Implemented as cosocket functions so they can be raced via ngx.thread.
 
@@ -58,8 +72,8 @@ local function fetch_dmm(code)
     local api_url =
         "https://api.dmm.com/affiliate/v3/ItemList?"
         .. ngx.encode_args({
-            api_id = "UrwskPfkqQ0DuVry2gYL",
-            affiliate_id = "10278-996",
+            api_id = DMM_API_ID,
+            affiliate_id = DMM_AFFILIATE_ID,
             output = "json",
             site = "FANZA",
             sort = "match",
