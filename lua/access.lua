@@ -1,12 +1,15 @@
 -- Request gate, honouring the DMM_API_PROTECT master switch in config.lua.
 --
--- When protection is OFF: gate() and require_sig() allow everything, and nothing
--- is rate-limited or signed (fully open).
+-- Token auth: /api/* always requires a bearer token (enforced in router.check_auth),
+-- regardless of DMM_API_PROTECT. /proxy/* does NOT require a token.
 --
 -- When protection is ON:
---   * gate()         -> enforces the optional client-IP whitelist (all requests).
+--   * gate()         -> enforces the optional client-IP whitelist + rate limit.
 --   * require_sig()  -> /proxy/* requests must carry a valid, unexpired HMAC
 --                       signature so leaked URLs only work for SIGN_TTL seconds.
+--
+-- When protection is OFF: gate() and require_sig() allow everything (no
+-- signature, no rate limit, no IP whitelist); /proxy/* is fully open.
 
 local cjson = require "cjson"
 local config = require "config"
@@ -64,19 +67,6 @@ function _M.require_sig()
     end
     if not sign.verify() then
         deny(403, "forbidden", "Invalid or expired signature")
-    end
-end
-
--- Mandatory Bearer token on ALL external interfaces (both /api/* and /proxy/*),
--- regardless of the DMM_API_PROTECT switch. Behaviour mirrors router.check_auth().
-function _M.require_token()
-    local auth_header = ngx.req.get_headers()["Authorization"]
-    if not auth_header then
-        deny(401, "unauthorized", "Missing Authorization header. Use: Authorization: Bearer <token>")
-    end
-    local token = auth_header:match("^Bearer%s+(.+)$")
-    if not token or token ~= config.AUTH_TOKEN then
-        deny(403, "forbidden", "Invalid token")
     end
 end
 

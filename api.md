@@ -12,12 +12,12 @@
 
 `DMM_API_PROTECT` 控制**代理侧**的防滥用保护（签名 URL、限流、IP 白名单），取值：`on`/`true`/`1`/`yes`（开启）或 `off`/空（关闭）。
 
-> 注意：**所有对外接口**（`/api/*` 与 `/proxy/*`）**始终需要 `Authorization: Bearer <token>`**（无论 `DMM_API_PROTECT` 是 `on` 还是 `off`）。该开关只额外控制 `/proxy/*` 是否需要签名、限流与 IP 白名单。
+> 注意：**`/api/*` 接口始终需要 `Authorization: Bearer <token>`**（无论 `DMM_API_PROTECT` 是 `on` 还是 `off`）。`/proxy/*` **不需要 token**；该开关只控制 `/proxy/*` 是否需要签名、限流与 IP 白名单。
 
 | 开关 | `/api/*` | `/proxy/*` |
 |------|----------|------------|
-| **on**（默认，推荐生产） | 需要 `Authorization: Bearer <token>` | 需要 `Bearer token` **且** `DMM_SIGN_TTL`（默认 220s）内有效的**签名 URL** + 限流 + 可选 IP 白名单 |
-| **off** | 需要 `Authorization: Bearer <token>` | 需要 `Bearer token`，**不要求签名**、无限流/IP 白名单 |
+| **on**（默认，推荐生产） | 需要 `Authorization: Bearer <token>` | **无需 token**，需 `DMM_SIGN_TTL`（默认 220s）内有效的**签名 URL** + 限流 + 可选 IP 白名单 |
+| **off** | 需要 `Authorization: Bearer <token>`，返回的 `proxy.*` 为普通路径 | **无需 token**、不要求签名、无限流/IP 白名单 |
 
 辅助配置：
 
@@ -49,7 +49,7 @@ Authorization: Bearer <DMM_AUTH_TOKEN>
 | 状态码 | 含义 |
 |--------|------|
 | `200` | 成功 |
-| `401` | 缺少 Authorization 头（始终生效，`/api/*` 与 `/proxy/*`） |
+| `401` | 缺少 Authorization 头（始终生效，`/api/*`） |
 | `403` | token 无效；或 on 时签名无效/过期/IP 不在白名单 |
 | `429` | 超出单 IP 限流（on 时） |
 | `404` | 对应 DMM 资源未找到 |
@@ -242,7 +242,7 @@ GET /proxy/pics/{path}
 
 把 DMM 图片 CDN 的请求经本机（日本节点）转发，客户端直接可访问而不被 DMM 地区限制挡掉。通常由 `/api/cover` 返回的 `proxy.*` 路径使用。
 
-**鉴权**：请求需携带 `Authorization: Bearer <token>`（无论 on/off）；`on` 时另需有效签名 `?sig=&exp=`。
+**鉴权**：请求**无需携带 token**；`on` 时需有效签名 `?sig=&exp=`（`/api/cover` 返回时已附带），`off` 时直接访问。
 
 | 代理路径 | 上游 CDN |
 |----------|----------|
@@ -250,18 +250,16 @@ GET /proxy/pics/{path}
 | `/proxy/sample/{path}` | `https://awsimgsrc.dmm.co.jp/dig_white/{path}`（高清剧照） |
 | `/proxy/pics/{path}` | `https://pics.dmm.co.jp/{path}`（标准） |
 
-- 访问 `/proxy/*` 时（**无论 on/off**）**必须携带 `Authorization: Bearer <token>`**。
-- `DMM_API_PROTECT=off` 时：带 token 即可，直接使用 `/api/cover` 返回的原始 `proxy.*` 路径（无签名）。
-- `DMM_API_PROTECT=on` 时：`/api/cover` 返回的 `proxy.*` 已自带 `?sig=&exp=`，带 token + 签名直接使用即可；若去掉签名参数或已过期，返回 `403`。
+- 访问 `/proxy/*` 时**无需携带 token**。
+- `DMM_API_PROTECT=off` 时：直接使用 `/api/cover` 返回的原始 `proxy.*` 路径（无签名）。
+- `DMM_API_PROTECT=on` 时：`/api/cover` 返回的 `proxy.*` 已自带 `?sig=&exp=`，直接使用即可；若去掉签名参数或已过期，返回 `403`。
 
 **示例**（off 时的原始路径）
 
 ```http
 GET /proxy/aws/digital/video/sone00128/sone00128pl.jpg
-Authorization: Bearer <DMM_AUTH_TOKEN>
 
 GET /proxy/pics/digital/video/sone00128/sone00128pl.jpg
-Authorization: Bearer <DMM_AUTH_TOKEN>
 ```
 
 响应为 `image/jpeg`，支持 Range。
@@ -278,14 +276,13 @@ GET /proxy/video/{path}
 
 - 请求头自动携带浏览器 UA 与 `Referer: https://www.dmm.co.jp/`，避免 CDN 403
 - `proxy_buffering off`，边下边播
-- **必须携带 `Authorization: Bearer <token>`**（无论 on/off）
+- **无需携带 token**
 - `DMM_API_PROTECT=on` 时，路径需带签名 `?sig=&exp=`（`/api/trailer` 返回时已附带），否则 `403`
 
 **示例**（off 时的原始路径，on 时末尾追加 `?sig=&exp=`）
 
 ```http
 GET /proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_mhb_w.mp4
-Authorization: Bearer <DMM_AUTH_TOKEN>
 ```
 
 响应 `Content-Type: video/mp4`，支持 `Range`（返回 `206 Partial Content`）。

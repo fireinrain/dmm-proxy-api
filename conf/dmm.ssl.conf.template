@@ -72,7 +72,6 @@ server {
         access_by_lua_block {
             local access = require "access"
             access.gate()
-            access.require_token()
             access.require_sig()
         }
         proxy_pass https://pics.dmm.co.jp/$pics_path$is_args$args;
@@ -95,7 +94,6 @@ server {
         access_by_lua_block {
             local access = require "access"
             access.gate()
-            access.require_token()
             access.require_sig()
         }
         proxy_pass https://awsimgsrc.dmm.co.jp/pics_dig/$aws_path$is_args$args;
@@ -118,7 +116,6 @@ server {
         access_by_lua_block {
             local access = require "access"
             access.gate()
-            access.require_token()
             access.require_sig()
         }
         proxy_pass https://awsimgsrc.dmm.co.jp/dig_white/$sample_path$is_args$args;
@@ -141,7 +138,6 @@ server {
         access_by_lua_block {
             local access = require "access"
             access.gate()
-            access.require_token()
             access.require_sig()
         }
         proxy_pass https://cc3001.dmm.co.jp/$video_path$is_args$args;
@@ -167,7 +163,6 @@ server {
     location / {
         access_by_lua_block {
             local access = require "access"
-            access.require_token()
         }
         proxy_pass https://pics.dmm.co.jp;
         proxy_set_header Host pics.dmm.co.jp;

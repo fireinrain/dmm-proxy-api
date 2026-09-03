@@ -16,11 +16,11 @@
 # Entrypoint auto-detects them at startup: certs present -> 443 HTTPS enabled,
 # otherwise HTTP-only. Override host cert dir with: DMM_SSL_CERTS_DIR=/path
 #
-# DMM_API_PROTECT only controls whether /proxy/* needs a signature + rate-limit
-# + IP whitelist. ALL external interfaces (/api/* and /proxy/*) ALWAYS require
-# Authorization: Bearer <DMM_AUTH_TOKEN>, regardless of on/off.
-#   on  (default): /proxy/* needs Bearer token + a short-lived signed URL (sig+exp)
-#   off          : /proxy/* needs Bearer token only (no signature/limit)
+# Auth: /api/* ALWAYS requires Authorization: Bearer <DMM_AUTH_TOKEN>.
+# /proxy/* does NOT require a token. DMM_API_PROTECT only controls whether
+# /proxy/* needs a signature:
+#   on  (default): /api/* returns signed proxy URLs (?sig=&exp=), /proxy/* needs it
+#   off          : /api/* returns plain proxy paths, /proxy/* fully open
 # =============================================================================
 
 version: "3.8"
