@@ -6,3 +6,6 @@
 
 # Runtime logs
 logs/
+
+# SSL certs (never commit private keys)
+certs/

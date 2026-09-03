@@ -8,11 +8,12 @@
 
 ## 特性
 
-- **封面 / 剧照**：`/api/cover/:id` 返回 2K 高清封面（`awsimgsrc`）、标准封面与全部剧照的直链及代理路径
+- **封面 / 剧照**：`/api/cover/:id` 返回 2K 高清封面（`awsimgsrc`）、标准封面与直链及代理路径；`/api/film_sample/:id` 通过 DMM 官方 FANZA TV GraphQL API 一次性返回全部高清剧照
 - **预告片**：`/api/trailer/:id` 返回多个码率预告片的直链及代理路径
 - **智能 CID 探测**：番号（如 `ABP-477`）自动转成 DMM 内部多个候选 CID（如 `abp00477`、`abp0477`、`1abp477`）逐一探测，命中第一个可用项
 - **快速存在性探测**：用 `Range: bytes=0-1023` 请求，接受 `200/206/416`，探测预告片由 37s 降到约 1s
 - **流式视频代理**：`/proxy/video/*` 支持 HTTP Range，可在播放器内拖动进度条；自动带浏览器 UA 与 DMM 的 `Referer` 避免 CDN 403
+- **可选 HTTPS (SSL)**：证书目录存在即自动启用 443；无证书则纯 HTTP，开箱即用
 - **防滥用**：
   - `/api/*` **始终**需要 `Authorization: Bearer <token>`
   - `DMM_API_PROTECT=on` 时，`/proxy/*` 必须使用 `DMM_SIGN_TTL` 秒内有效的 **HMAC-SHA256 签名 URL**（防链接泄露后长期盗用），并有单 IP 限流与可选 IP 白名单
@@ -26,12 +27,16 @@
 dmm-proxy-api/
 ├── Dockerfile              # 基于 openresty/openresty:alpine
 ├── docker-compose.yml      # 一键编排，环境变量透传
+├── docker-compose.hub.yml  # 从 Docker Hub 拉镜像的编排文件
 ├── .env                    # 本地运行配置（注意：勿提交真实 token）
 ├── .env.example            # 配置模板
 ├── api.md                  # 接口详细文档（中文）
 ├── api.http                # REST Client 测试请求
 ├── conf/
-│   └── nginx.conf          # nginx + lua 路由、代理、限流 zone（改动需 rebuild）
+│   ├── nginx.conf          # nginx + lua 路由、代理、限流 zone（改动需 rebuild）
+│   └── dmm.ssl.conf.template # HTTPS(443) server 配置模板（entrypoint 按需启用）
+├── docker/entrypoint.sh    # 容器入口：检测证书，有则启用 SSL，无则纯 HTTP
+├── certs/                  # 存放 SSL 证书（fullchain.pem + privkey.pem），不入库
 ├── lua/                    # 业务逻辑（docker volume 挂载，改后可 reload）
 │   ├── config.lua          # 配置读取、CID 转换、代理路径与签名、IP 白名单工具
 │   ├── router.lua          # 鉴权 + 路由分发（check_auth）
@@ -39,6 +44,7 @@ dmm-proxy-api/
 │   ├── sign.lua            # HMAC-SHA256 签名 / 验签
 │   ├── web.lua             # 基于 vendored lua-resty-http 的探测与抓取
 │   ├── api_cover.lua       # /api/cover 实现
+│   ├── api_film_sample.lua # /api/film_sample 实现（FANZA TV GraphQL）
 │   └── api_trailer.lua     # /api/trailer 实现
 └── vendor/resty/           # 本地 vendor 的 lua-resty-http（纯 Lua，无需额外依赖）
 ```
