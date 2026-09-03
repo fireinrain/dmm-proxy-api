@@ -1,0 +1,8 @@
+# Local secrets / config — NOT committed (.env.example is the template)
+.env
+
+# macOS
+.DS_Store
+
+# Runtime logs
+logs/
