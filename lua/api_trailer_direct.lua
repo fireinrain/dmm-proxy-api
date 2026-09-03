@@ -14,6 +14,11 @@ local REQ_TIMEOUT = 5000 -- ms
 -- Source 1: AVWikiDB
 -- Parses the __NEXT_DATA__ JSON embedded in the page and reads
 -- props.pageProps.movie.sampleVideoBestUrl.
+--
+-- NOTE: AVWikiDB is behind Cloudflare (a "Just a moment..." JS challenge) and
+-- refuses datacenter/VPS IPs regardless of a fully-faked browser UA/headers.
+-- From a VPS this source will usually 403; it is kept as a best-effort extra
+-- source and is masked by the avwikiddb/dmm/javdatabase fallback chain.
 local function fetch_avwikidb(code)
     local url = "https://avwikidb.com/work/" .. ngx.escape_uri(code) .. "/"
     local httpc = require "resty.http".new()
@@ -21,7 +26,12 @@ local function fetch_avwikidb(code)
     local res, err = httpc:request_uri(url, {
         method = "GET",
         ssl_verify = false,
-        headers = { ["User-Agent"] = config.WEB.ua },
+        headers = {
+            ["User-Agent"] = config.WEB.ua,
+            ["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            ["Accept-Language"] = "en-US,en;q=0.9,ja;q=0.8",
+            ["Referer"] = "https://avwikidb.com/",
+        },
     })
     if not res or res.status ~= 200 then
         ngx.log(ngx.ERR, "avwikidb status=" .. (res and res.status or "nil") .. " err=" .. tostring(err))
