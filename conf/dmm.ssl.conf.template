@@ -61,9 +61,9 @@ server {
 
     # --- Health check ---
     location = /health {
-        access_by_lua_block {
-            ngx.say("ok")
-            return ngx.exit(ngx.HTTP_OK)
+        content_by_lua_block {
+            ngx.header["Content-Type"] = "application/json; charset=utf-8"
+            ngx.say('{"status":"ok"}')
         }
     }
 
