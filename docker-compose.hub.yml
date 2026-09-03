@@ -11,7 +11,7 @@
 # HTTPS (SSL) - OPTIONAL: put cert files into the host dir below (default ./certs)
 #   mkdir -p certs
 #   cp /path/to/fullchain.pem certs/fullchain.pem
-#   cp /path/to/privkey.pem   certs/privkey.pem
+#   cp /path/to/private.key   certs/private.key
 #   docker compose -f docker-compose.hub.yml up -d
 # Entrypoint auto-detects them at startup: certs present -> 443 HTTPS enabled,
 # otherwise HTTP-only. Override host cert dir with: DMM_SSL_CERTS_DIR=/path
@@ -40,7 +40,7 @@ services:
       - DMM_ALLOW_IPS=${DMM_ALLOW_IPS:-}
       - DMM_CERT_DIR=${DMM_CERT_DIR:-/etc/ssl/dmm}
       - DMM_CERT_FILE=${DMM_CERT_FILE:-fullchain.pem}
-      - DMM_CERT_KEY=${DMM_CERT_KEY:-privkey.pem}
+      - DMM_CERT_KEY=${DMM_CERT_KEY:-private.key}
     volumes:
       - ${DMM_SSL_CERTS_DIR:-./certs}:/etc/ssl/dmm:ro
     restart: unless-stopped

@@ -3,7 +3,7 @@
 #   cp .env.example .env                 # then edit .env (set DMM_AUTH_TOKEN)
 #   docker compose up -d --build
 #
-# HTTPS (SSL) - OPTIONAL: put fullchain.pem + privkey.pem into ./certs (or set
+# HTTPS (SSL) - OPTIONAL: put fullchain.pem + private.key into ./certs (or set
 # DMM_SSL_CERTS_DIR). Entrypoint auto-detects them at startup: present -> 443
 # HTTPS enabled, absent -> HTTP only.
 #
@@ -27,7 +27,7 @@ services:
       - DMM_ALLOW_IPS=${DMM_ALLOW_IPS:-}
       - DMM_CERT_DIR=${DMM_CERT_DIR:-/etc/ssl/dmm}
       - DMM_CERT_FILE=${DMM_CERT_FILE:-fullchain.pem}
-      - DMM_CERT_KEY=${DMM_CERT_KEY:-privkey.pem}
+      - DMM_CERT_KEY=${DMM_CERT_KEY:-private.key}
     volumes:
       - ./lua:/etc/openresty/lua/:ro
       - ${DMM_SSL_CERTS_DIR:-./certs}:/etc/ssl/dmm:ro

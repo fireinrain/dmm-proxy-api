@@ -11,7 +11,7 @@ set -e
 
 CERT_DIR="${DMM_CERT_DIR:-/etc/ssl/dmm}"
 CERT_FILE="${DMM_CERT_FILE:-fullchain.pem}"
-KEY_FILE="${DMM_CERT_KEY:-privkey.pem}"
+KEY_FILE="${DMM_CERT_KEY:-private.key}"
 CONF_DIR=/usr/local/openresty/nginx/conf/dmm.d
 RENDERED="$CONF_DIR/ssl.conf"
 TEMPLATE=/usr/local/openresty/nginx/conf/dmm.ssl.conf.template

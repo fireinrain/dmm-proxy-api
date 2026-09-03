@@ -36,7 +36,7 @@ dmm-proxy-api/
 │   ├── nginx.conf          # nginx + lua 路由、代理、限流 zone（改动需 rebuild）
 │   └── dmm.ssl.conf.template # HTTPS(443) server 配置模板（entrypoint 按需启用）
 ├── docker/entrypoint.sh    # 容器入口：检测证书，有则启用 SSL，无则纯 HTTP
-├── certs/                  # 存放 SSL 证书（fullchain.pem + privkey.pem），不入库
+├── certs/                  # 存放 SSL 证书（fullchain.pem + private.key），不入库
 ├── lua/                    # 业务逻辑（docker volume 挂载，改后可 reload）
 │   ├── config.lua          # 配置读取、CID 转换、代理路径与签名、IP 白名单工具
 │   ├── router.lua          # 鉴权 + 路由分发（check_auth）
@@ -80,7 +80,7 @@ cp .env.example .env
 | `DMM_PROXY_SSL_PORT` | `443` | 宿主机对外 HTTPS 端口 |
 | `DMM_CERT_DIR` | `/etc/ssl/dmm` | 容器内证书目录 |
 | `DMM_CERT_FILE` | `fullchain.pem` | 证书文件名 |
-| `DMM_CERT_KEY` | `privkey.pem` | 私钥文件名 |
+| `DMM_CERT_KEY` | `private.key` | 私钥文件名 |
 
 ### 4. 启动
 
@@ -105,7 +105,7 @@ curl http://localhost:8080/health    # -> ok
 mkdir -p certs
 # 将证书拷贝为固定文件名（可用环境变量覆盖）
 cp /path/to/fullchain.pem certs/fullchain.pem
-cp /path/to/privkey.pem   certs/privkey.pem
+cp /path/to/private.key   certs/private.key
 
 docker compose up -d --build
 ```
@@ -123,9 +123,9 @@ curl -k https://localhost:8443/health   # -> ok（HTTPS 已启用）
 | `DMM_SSL_CERTS_DIR` | `./certs` | 宿主机证书目录（compose 挂载源） |
 | `DMM_CERT_DIR` | `/etc/ssl/dmm` | 容器内证书路径 |
 | `DMM_CERT_FILE` | `fullchain.pem` | 证书文件名 |
-| `DMM_CERT_KEY` | `privkey.pem` | 私钥文件名 |
+| `DMM_CERT_KEY` | `private.key` | 私钥文件名 |
 
-> 证书文件**最少需要** `fullchain.pem`（或证书链）与 `privkey.pem` 两个，才会启用 HTTPS；缺任一即退回纯 HTTP。
+> 证书文件**最少需要** `fullchain.pem`（或证书链）与 `private.key` 两个，才会启用 HTTPS；缺任一即退回纯 HTTP。
 
 **从 Docker Hub 拉取镜像运行**（无需本地构建）：
 
@@ -338,4 +338,4 @@ Authorization: Bearer <token>
 确认请求带了 `Range` 头并获得 `206`；`/proxy/video/*` 已关闭缓冲（`proxy_buffering off`）、`proxy_read_timeout 120s`。
 
 **为什么 HTTPS 没生效？**
-`entrypoint.sh` 要求 `/etc/ssl/dmm/` 下同时存在 `fullchain.pem` 与 `privkey.pem` 才开始监听 443。检查：① 证书是否已放入宿主机 `./certs/`；② `docker logs dmm-proxy` 是否显示 `SSL enabled`；③ 证书文件是否有读取权限。
+`entrypoint.sh` 要求 `/etc/ssl/dmm/` 下同时存在 `fullchain.pem` 与 `private.key` 才开始监听 443。检查：① 证书是否已放入宿主机 `./certs/`；② `docker logs dmm-proxy` 是否显示 `SSL enabled`；③ 证书文件是否有读取权限。

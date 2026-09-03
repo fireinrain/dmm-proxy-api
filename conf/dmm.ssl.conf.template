@@ -10,7 +10,7 @@ server {
     server_name _;
 
     ssl_certificate     /etc/ssl/dmm/fullchain.pem;
-    ssl_certificate_key /etc/ssl/dmm/privkey.pem;
+    ssl_certificate_key /etc/ssl/dmm/private.key;
 
     ssl_protocols       TLSv1.2 TLSv1.3;
     ssl_ciphers         HIGH:!aNULL:!MD5;
