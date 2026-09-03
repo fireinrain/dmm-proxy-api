@@ -237,13 +237,21 @@ Authorization: Bearer <token>
 GET /api/trailer_direct/:id
 ```
 
-按番号返回一个**可直接播放的预告片直链**（来自第三方源，非本机代理）。流程：
+按番号返回一个**可直接播放的预告片直链**（来自第三方源，非本机代理）。
 
-1. 先查内存缓存（`trailer_cache`，`lua_shared_dict`），命中直接返回。
+**鉴权**：请求**始终需要** `Authorization: Bearer <token>`（与其它 `/api/*` 一致）。
+
+**输入**：`:id` 为番号（如 `SNOS-213`）。服务端会**规范化**为全大写并去空白后作为缓存键与查询关键词；**不做格式校验**，任意字符串都接受，任何源都查不到才返回 `404`。
+
+**流程**：
+
+1. 先查内存缓存（`trailer_cache`，`lua_shared_dict`，键为 `td:<规范化番号>`），命中直接返回。
 2. 未命中则**并发请求三个源**（AVWikiDB / DMM FANZA / JAVDatabase），谁先成功用谁的；单路超时 5 秒。
-3. 命中后写入缓存，**TTL 7 天**，并附带 `source` 字段。
+3. 命中后写入缓存（URL 与 source 各 7 天 TTL），并附带 `source` 字段。
 
-> 注意：缓存为纯内存（`lua_shared_dict`），**容器重启会清空**，但重查一次即重新缓存 7 天。
+> 注意：
+> - 缓存为纯内存（`lua_shared_dict`），**容器重启会清空**，但重查一次即重新缓存 7 天。
+> - **AVWikiDB 源**位于 Cloudflare 反爬（"Just a moment..." JS 挑战）之后，会拒绝数据中心/VPS IP，通常返回 `403`（详见代码注释）。正常主要由 **DMM FANZA** 与 **JAVDatabase** 两路提供结果。
 
 **示例请求**
 
@@ -276,6 +284,18 @@ Authorization: Bearer <token>
 |------|------|
 | `400` | 缺少番号 |
 | `404` | 三个源均未找到预告片 |
+
+`400` 示例（未带番号）：
+
+```json
+{ "error": "bad_request", "message": "Missing code" }
+```
+
+`404` 示例：
+
+```json
+{ "error": "not_found", "message": "No trailer found for code: ZZZ-99999" }
+```
 
 ---
 
