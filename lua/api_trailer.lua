@@ -4,11 +4,22 @@ local web = require "web"
 
 local _M = {}
 
+-- Quality ladder, highest first. DMM preview files use the suffix:
+--   hhb = 1080p, hmb = 720p, mhb = 480p, dmb = 450p, dm = 360p, sm = 240p.
+--
+-- Only the top PROBE_TOPN entries (hhb/hmb/mhb) are actually probed, so the
+-- response keeps just the highest tiers. The lower entries (dmb/dm/sm) are
+-- retained below for possible future use but are NOT probed.
+local PROBE_TOPN = 3
+
 local qualities = {
-    { quality = "sm",  suffix = "_sm_w.mp4",  bitrate = 300  },
-    { quality = "dm",  suffix = "_dm_w.mp4",  bitrate = 1000 },
-    { quality = "dmb", suffix = "_dmb_w.mp4", bitrate = 1500 },
+    { quality = "hhb", suffix = "_hhb_w.mp4", bitrate = 5000 },
+    { quality = "hmb", suffix = "_hmb_w.mp4", bitrate = 3000 },
     { quality = "mhb", suffix = "_mhb_w.mp4", bitrate = 2500 },
+    -- (dormant, not probed) lower tiers kept for future use:
+    { quality = "dmb", suffix = "_dmb_w.mp4", bitrate = 1500 },
+    { quality = "dm",  suffix = "_dm_w.mp4",  bitrate = 1000 },
+    { quality = "sm",  suffix = "_sm_w.mp4",  bitrate = 300  },
 }
 
 function _M.handle(raw_id)
@@ -20,7 +31,9 @@ function _M.handle(raw_id)
             .. string.sub(cid, 1, 1) .. "/" .. string.sub(cid, 1, 3) .. "/" .. cid .. "/"
         local base = config.CDN.litevideo .. "/" .. lite_dir
 
-        for _, q in ipairs(qualities) do
+        -- Probe only the top PROBE_TOPN quality tiers (highest first).
+        for i = 1, math.min(PROBE_TOPN, #qualities) do
+            local q = qualities[i]
             local file = cid .. q.suffix
             local url = base .. file
             if web.check_url_exists(url) then
