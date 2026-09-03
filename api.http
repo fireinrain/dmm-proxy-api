@@ -23,11 +23,15 @@ GET {{host}}/api/film_sample/snos-213
 Authorization: Bearer {{token}}
 
 ### 3. 预告片信息（始终需 token；返回的 proxy 在 on 时为签名 URL）
-GET {{host}}/api/trailer/SSIS-497
+GET {{host}}/api/trailer/SNOS-213
 Authorization: Bearer {{token}}
 
 ### 3.1 预告片信息 - 其他番号示例
 GET {{host}}/api/trailer/IPX-535
+Authorization: Bearer {{token}}
+
+### 3.2 预告片直链（始终需 token；并发请求 AVWikiDB/DMM/JAVDatabase，谁先成功用谁；命中走 7 天缓存并返回 source）
+GET {{host}}/api/trailer_direct/SNOS-213
 Authorization: Bearer {{token}}
 
 ### 4. 封面图片代理（无需 token；off 时用原始路径，on 时请用 /api/cover 返回的签名 proxy URL）

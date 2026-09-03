@@ -45,6 +45,20 @@ server {
         }
     }
 
+    # --- API: Trailer direct link ---
+    location ~ ^/api/trailer_direct/(?<api_id>[^/]+)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_trailer_direct()
+        }
+    }
+
     # --- API: Film Sample ---
     location ~ ^/api/film_sample/(?<api_id>[^/]+)$ {
         access_by_lua_block {

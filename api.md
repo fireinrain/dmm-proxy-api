@@ -191,7 +191,7 @@ Authorization: Bearer <token>
 GET /api/trailer/:id
 ```
 
-根据番号返回预告片的多个码率直链与本机代理路径。仅返回探测存在的码率。
+根据番号返回预告片的多个码率直链与本机代理路径。仅返回探测存在的码率；探测顺序从最高档开始，且只探测最高三档（`hhb`/1080p、`hmb`/720p、`mhb`/480p），更低的 `dmb`/`dm`/`sm` 档不再返回。
 
 **示例请求**
 
@@ -207,9 +207,7 @@ Authorization: Bearer <token>
   "id": "SSIS-497",
   "cid": "ssis00497",
   "trailers": [
-    { "quality": "sm",  "bitrate": 300,  "url": "https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00497/ssis00497_sm_w.mp4",  "proxy": "/proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_sm_w.mp4" },
-    { "quality": "dm",  "bitrate": 1000, "url": "https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00497/ssis00497_dm_w.mp4",  "proxy": "/proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_dm_w.mp4" },
-    { "quality": "dmb", "bitrate": 1500, "url": "https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00497/ssis00497_dmb_w.mp4", "proxy": "/proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_dmb_w.mp4" },
+    { "quality": "hmb", "bitrate": 3000, "url": "https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00497/ssis00497_hmb_w.mp4", "proxy": "/proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_hmb_w.mp4" },
     { "quality": "mhb", "bitrate": 2500, "url": "https://cc3001.dmm.co.jp/litevideo/freepv/s/ssi/ssis00497/ssis00497_mhb_w.mp4", "proxy": "/proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_mhb_w.mp4" }
   ]
 }
@@ -221,7 +219,7 @@ Authorization: Bearer <token>
 |------|------|
 | `id` | 用户传入的番号（大写） |
 | `cid` | 探测命中的 DMM 内容 ID |
-| `trailers[].quality` | 码率档位：`sm`(300k) / `dm`(1000k) / `dmb`(1500k) / `mhb`(2500k) |
+| `trailers[].quality` | 码率档位：`hhb`(5000k/1080p) / `hmb`(3000k/720p) / `mhb`(2500k/480p) |
 | `trailers[].bitrate` | 码率（kbps） |
 | `trailers[].url` | DMM 预告片直链 |
 | `trailers[].proxy` | 本机代理路径（推荐使用，可避开地区封锁） |
@@ -230,6 +228,54 @@ Authorization: Bearer <token>
 > ```json
 > { "error": "not_found", "message": "Trailer not found for id: SONE-128" }
 > ```
+
+---
+
+## 4.1 预告片直链（多源并发 + 缓存）
+
+```
+GET /api/trailer_direct/:id
+```
+
+按番号返回一个**可直接播放的预告片直链**（来自第三方源，非本机代理）。流程：
+
+1. 先查内存缓存（`trailer_cache`，`lua_shared_dict`），命中直接返回。
+2. 未命中则**并发请求三个源**（AVWikiDB / DMM FANZA / JAVDatabase），谁先成功用谁的；单路超时 5 秒。
+3. 命中后写入缓存，**TTL 7 天**，并附带 `source` 字段。
+
+> 注意：缓存为纯内存（`lua_shared_dict`），**容器重启会清空**，但重查一次即重新缓存 7 天。
+
+**示例请求**
+
+```http
+GET http://localhost:8080/api/trailer_direct/SNOS-213
+Authorization: Bearer <token>
+```
+
+**示例响应 `200`**
+
+```json
+{
+  "code": "SNOS-213",
+  "trailer": "https://cc3001.dmm.co.jp/pv/EDR4RCcjis11tGx2qP81rb6ZHD-bXv-mJM9oT8ultnH13mhCLb2MriUh1-SGjA/snos00213mhb.mp4",
+  "source": "javdatabase"
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `code` | 规范化的番号（大写、去空格） |
+| `trailer` | 可直连播放的预告片 URL（来自第三方源） |
+| `source` | 命中的来源：`avwikidb` / `dmm` / `javdatabase` |
+
+**错误码**
+
+| 状态 | 场景 |
+|------|------|
+| `400` | 缺少番号 |
+| `404` | 三个源均未找到预告片 |
 
 ---
 

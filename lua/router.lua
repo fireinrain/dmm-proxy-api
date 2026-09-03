@@ -59,6 +59,22 @@ function _M.handle_trailer()
     trailer.handle(id)
 end
 
+function _M.handle_trailer_direct()
+    local id = ngx.var.api_id
+    if not id or id == "" then
+        ngx.status = 400
+        ngx.header["Content-Type"] = "application/json; charset=utf-8"
+        ngx.say(cjson.encode({
+            error = "bad_request",
+            message = "Missing id parameter. Usage: /api/trailer_direct/:id",
+        }))
+        return
+    end
+
+    local trailer_direct = require "api_trailer_direct"
+    trailer_direct.handle(id)
+end
+
 function _M.handle_film_sample()
     local id = ngx.var.api_id
     if not id or id == "" then

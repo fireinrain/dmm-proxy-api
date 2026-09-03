@@ -9,7 +9,8 @@
 ## 特性
 
 - **封面 / 剧照**：`/api/cover/:id` 返回 2K 高清封面（`awsimgsrc`）、标准封面与直链及代理路径；`/api/film_sample/:id` 通过 DMM 官方 FANZA TV GraphQL API 一次性返回全部高清剧照
-- **预告片**：`/api/trailer/:id` 返回多个码率预告片的直链及代理路径
+- **预告片**：`/api/trailer/:id` 返回多个码率预告片的直链及代理路径；探测从最高档（`hhb`/1080p）开始，只返回最高三档
+- **预告片直链**：`/api/trailer_direct/:id` 并发请求 AVWikiDB / DMM / JAVDatabase，谁先成功用谁，并带 `source`；命中结果缓存 7 天（`lua_shared_dict`）
 - **智能 CID 探测**：番号（如 `ABP-477`）自动转成 DMM 内部多个候选 CID（如 `abp00477`、`abp0477`、`1abp477`）逐一探测，命中第一个可用项
 - **快速存在性探测**：用 `Range: bytes=0-1023` 请求，接受 `200/206/416`，探测预告片由 37s 降到约 1s
 - **流式视频代理**：`/proxy/video/*` 支持 HTTP Range，可在播放器内拖动进度条；自动带浏览器 UA 与 DMM 的 `Referer` 避免 CDN 403
@@ -46,6 +47,7 @@ dmm-proxy-api/
 │   ├── api_cover.lua       # /api/cover 实现
 │   ├── api_film_sample.lua # /api/film_sample 实现（FANZA TV GraphQL）
 │   └── api_trailer.lua     # /api/trailer 实现
+│   └── api_trailer_direct.lua # /api/trailer_direct 实现（多源并发 + 7 天缓存）
 └── vendor/resty/           # 本地 vendor 的 lua-resty-http（纯 Lua，无需额外依赖）
 ```
 
