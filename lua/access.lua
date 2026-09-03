@@ -67,4 +67,17 @@ function _M.require_sig()
     end
 end
 
+-- Mandatory Bearer token on ALL external interfaces (both /api/* and /proxy/*),
+-- regardless of the DMM_API_PROTECT switch. Behaviour mirrors router.check_auth().
+function _M.require_token()
+    local auth_header = ngx.req.get_headers()["Authorization"]
+    if not auth_header then
+        deny(401, "unauthorized", "Missing Authorization header. Use: Authorization: Bearer <token>")
+    end
+    local token = auth_header:match("^Bearer%s+(.+)$")
+    if not token or token ~= config.AUTH_TOKEN then
+        deny(403, "forbidden", "Invalid token")
+    end
+end
+
 return _M

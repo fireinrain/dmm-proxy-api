@@ -15,9 +15,9 @@
 - **流式视频代理**：`/proxy/video/*` 支持 HTTP Range，可在播放器内拖动进度条；自动带浏览器 UA 与 DMM 的 `Referer` 避免 CDN 403
 - **可选 HTTPS (SSL)**：证书目录存在即自动启用 443；无证书则纯 HTTP，开箱即用
 - **防滥用**：
-  - `/api/*` **始终**需要 `Authorization: Bearer <token>`
-  - `DMM_API_PROTECT=on` 时，`/proxy/*` 必须使用 `DMM_SIGN_TTL` 秒内有效的 **HMAC-SHA256 签名 URL**（防链接泄露后长期盗用），并有单 IP 限流与可选 IP 白名单
-  - `DMM_API_PROTECT=off` 时，`/proxy/*` 不签名、不限流（仅 `/api/*` 仍需 token）
+  - **所有对外接口**（`/api/*` 与 `/proxy/*`）**始终**需要 `Authorization: Bearer <token>`
+  - `DMM_API_PROTECT=on` 时，`/proxy/*` 在 token 之外**还要求** `DMM_SIGN_TTL` 秒内有效的 **HMAC-SHA256 签名 URL**（防链接泄露后长期盗用），并有单 IP 限流与可选 IP 白名单
+  - `DMM_API_PROTECT=off` 时，`/proxy/*` 仍要求 token，但**不要求签名**、无限流、无 IP 白名单
 
 ---
 
@@ -40,7 +40,7 @@ dmm-proxy-api/
 ├── lua/                    # 业务逻辑（docker volume 挂载，改后可 reload）
 │   ├── config.lua          # 配置读取、CID 转换、代理路径与签名、IP 白名单工具
 │   ├── router.lua          # 鉴权 + 路由分发（check_auth）
-│   ├── access.lua          # gate（IP 白名单 + 限流）与 require_sig（签名校验）
+│   ├── access.lua          # require_token（Bearer token 校验）、gate（IP 白名单 + 限流）、require_sig（签名校验）
 │   ├── sign.lua            # HMAC-SHA256 签名 / 验签
 │   ├── web.lua             # 基于 vendored lua-resty-http 的探测与抓取
 │   ├── api_cover.lua       # /api/cover 实现
@@ -71,13 +71,16 @@ cp .env.example .env
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DMM_AUTH_TOKEN` | `change-me-in-production` | `/api/*` 的 Bearer token，同时作为签名 URL 的 HMAC 密钥。**生产必改**：`openssl rand -hex 32` |
-| `DMM_API_PROTECT` | `on` | 代理侧防滥用总开关，`on/true/1/yes` 开启，`off/空` 关闭。**不影响 `/api/*` 的 token 校验** |
+| `DMM_AUTH_TOKEN` | `change-me-in-production` | 所有对外接口（`/api/*` 与 `/proxy/*`）的 Bearer token，同时作为签名 URL 的 HMAC 密钥。**生产必改**：`openssl rand -hex 32` |
+| `DMM_API_PROTECT` | `on` | 代理侧防滥用总开关，`on/true/1/yes` 开启，`off/空` 关闭。控制 `/proxy/*` 是否要求签名/限流/IP 白名单；**无论 on/off，`/proxy/*` 都始终要求 Bearer token** |
 | `DMM_SIGN_TTL` | `220` | on 时签名 URL 的有效秒数 |
 | `DMM_RATE_PER_MIN` | `240` | on 时单 IP 每分钟请求上限 |
 | `DMM_ALLOW_IPS` | 空 | on 时可选的 IP 白名单，逗号分隔 IP 与 CIDR（如 `1.2.3.4,203.0.113.0/24`），空=放行全部 |
 | `DMM_PROXY_PORT` | `80` | 宿主机对外 HTTP 端口 |
 | `DMM_PROXY_SSL_PORT` | `443` | 宿主机对外 HTTPS 端口 |
+| `DMM_CERT_DIR` | `/etc/ssl/dmm` | 容器内证书目录 |
+| `DMM_CERT_FILE` | `fullchain.pem` | 证书文件名 |
+| `DMM_CERT_KEY` | `privkey.pem` | 私钥文件名 |
 
 ### 4. 启动
 
@@ -92,13 +95,54 @@ curl http://localhost:8080/health    # -> ok
 > - `conf/nginx.conf` 在 build 时被 COPY 进镜像，改动后需 `docker compose up -d --build`
 > - `lua/` 通过 volume 挂载进容器（`./lua:/etc/openresty/lua/:ro`），改逻辑后执行 `docker compose restart`（reload worker）即可
 
-### 5. 尝试验证
+### 5. 启用 HTTPS (SSL)（可选）
+
+容器启动时 `entrypoint.sh` 会自动检测证书目录：**存在证书即启用 443，否则纯 HTTP**。无需额外开关。
+
+**放置证书**（默认从宿主机 `./certs/` 挂载）：
+
+```bash
+mkdir -p certs
+# 将证书拷贝为固定文件名（可用环境变量覆盖）
+cp /path/to/fullchain.pem certs/fullchain.pem
+cp /path/to/privkey.pem   certs/privkey.pem
+
+docker compose up -d --build
+```
+
+**验证**：
+
+```bash
+curl -k https://localhost:8443/health   # -> ok（HTTPS 已启用）
+```
+
+证书可用以下环境变量自定义文件名与路径：
+
+| 变量 | 默认 | 说明 |
+|------|------|------|
+| `DMM_SSL_CERTS_DIR` | `./certs` | 宿主机证书目录（compose 挂载源） |
+| `DMM_CERT_DIR` | `/etc/ssl/dmm` | 容器内证书路径 |
+| `DMM_CERT_FILE` | `fullchain.pem` | 证书文件名 |
+| `DMM_CERT_KEY` | `privkey.pem` | 私钥文件名 |
+
+> 证书文件**最少需要** `fullchain.pem`（或证书链）与 `privkey.pem` 两个，才会启用 HTTPS；缺任一即退回纯 HTTP。
+
+**从 Docker Hub 拉取镜像运行**（无需本地构建）：
+
+```bash
+docker compose -f docker-compose.hub.yml up -d
+```
+
+### 6. 尝试验证
 
 ```bash
 HEADER="Authorization: Bearer <你的DMM_AUTH_TOKEN>"
 
 # 封面
 curl -s -H "$HEADER" http://localhost:8080/api/cover/SONE-128
+
+# 剧照
+curl -s -H "$HEADER" http://localhost:8080/api/film_sample/SSIS-497
 
 # 预告片
 curl -s -H "$HEADER" http://localhost:8080/api/trailer/SSIS-497
@@ -110,12 +154,12 @@ curl -s -H "$HEADER" http://localhost:8080/api/trailer/SSIS-497
 
 | 开关 | `/api/*` | `/proxy/*`（代理） |
 |------|----------|---------------------|
-| **on**（默认，推荐生产） | 需要 `Authorization: Bearer <token>` | 仅 `DMM_SIGN_TTL` 内有效的**签名 URL** + 限流 + 可选 IP 白名单 |
-| **off** | 需要 `Authorization: Bearer <token>`（**始终生效**） | 无需签名，直接可访问，不限流、无 IP 白名单 |
+| **on**（默认，推荐生产） | 需要 `Authorization: Bearer <token>` | 需要 `Bearer token` **且** `DMM_SIGN_TTL` 内有效的**签名 URL** + 限流 + 可选 IP 白名单 |
+| **off** | 需要 `Authorization: Bearer <token>` | 需要 `Bearer token`，**不签名**、不限流、无 IP 白名单 |
 
 **on 时的签名 URL**
 
-`/api/cover` 与 `/api/trailer` 返回的 `proxy.*` 字段是短时效签名链接：
+`/api/cover`、`/api/film_sample` 与 `/api/trailer` 返回的 `proxy.*` 字段是短时效签名链接：
 
 ```
 /proxy/video/{path}?sig=<hex-hmac-sha256>&exp=<unix_ts>
@@ -154,14 +198,39 @@ Authorization: Bearer <token>
     "hd": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00128/sone00128pl.jpg",
     "sd": "https://pics.dmm.co.jp/digital/video/sone00128/sone00128pl.jpg",
     "small": "https://pics.dmm.co.jp/digital/video/sone00128/sone00128pt.jpg",
-    "samples": [],
     "proxy": {
       "hd": "/proxy/aws/digital/video/sone00128/sone00128pl.jpg",
       "sd": "/proxy/pics/digital/video/sone00128/sone00128pl.jpg",
-      "small": "/proxy/pics/digital/video/sone00128/sone00128pt.jpg",
-      "samples_url": "/proxy/pics/digital/video/sone00128/"
+      "small": "/proxy/pics/digital/video/sone00128/sone00128pt.jpg"
     }
   }
+}
+```
+
+### 剧照
+
+```
+GET /api/film_sample/:id
+Authorization: Bearer <token>
+```
+
+通过 DMM 官方公开的 **FANZA TV GraphQL API**（`https://api.tv.dmm.co.jp/graphql`）一次性获取该番号的全部高清剧照（无需逐个探测，且能拿到 `2K` 大图）。
+
+**响应 `200`（节选）**
+
+```json
+{
+  "id": "SSIS-497",
+  "cid": "ssis00497",
+  "total": 10,
+  "samples": [
+    {
+      "index": 1,
+      "small": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497-1.jpg",
+      "large": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497jp-1.jpg",
+      "proxy": "/proxy/sample/digital/video/ssis00497/ssis00497jp-1.jpg"
+    }
+  ]
 }
 ```
 
@@ -191,12 +260,14 @@ Authorization: Bearer <token>
 
 | 路径 | 上游 | 说明 |
 |------|------|------|
-| `/proxy/aws/{path}` | `https://awsimgsrc.dmm.co.jp/pics_dig/{path}` | 2K 高清图 |
+| `/proxy/aws/{path}` | `https://awsimgsrc.dmm.co.jp/pics_dig/{path}` | 2K 高清封面 |
+| `/proxy/sample/{path}` | `https://awsimgsrc.dmm.co.jp/dig_white/{path}` | 高清剧照 |
 | `/proxy/pics/{path}` | `https://pics.dmm.co.jp/{path}` | 标准图 |
 | `/proxy/video/{path}` | `https://cc3001.dmm.co.jp/{path}` | 预告片视频，支持 Range |
 
-- `DMM_API_PROTECT=off` 时直接用 `/api/*` 返回的原始 `proxy.*` 路径
-- `DMM_API_PROTECT=on` 时，`/api/*` 返回的 `proxy.*` 已附带 `?sig=&exp=`，直接用即可；去掉签名或过期将返回 `403`
+访问 `/proxy/*` 时，无论 on/off，**都需携带 `Authorization: Bearer <token>`**：
+- `DMM_API_PROTECT=off` 时：带 token 即可，直接用 `/api/*` 返回的原始 `proxy.*` 路径（无签名）
+- `DMM_API_PROTECT=on` 时：`/api/*` 返回的 `proxy.*` 已附带 `?sig=&exp=`，请求时带 token + 签名直接用即可；签名缺失/过期将返回 `403`
 
 ### 状态码
 
@@ -205,7 +276,7 @@ Authorization: Bearer <token>
 | `200` | 成功 |
 | `206` | 部分内容（视频/图片 Range） |
 | `400` | 参数缺失 |
-| `401` | 缺少 `Authorization` 头（始终生效） |
+| `401` | 缺少 `Authorization` 头（始终生效，`/api/*` 与 `/proxy/*`） |
 | `403` | token 无效；或 on 时签名无效/过期、IP 不在白名单 |
 | `404` | 对应 DMM 资源未找到 |
 | `429` | 超出单 IP 限流（on 时） |
@@ -214,13 +285,18 @@ Authorization: Bearer <token>
 
 ## 工作原理
 
-1. 客户端请求 `/api/cover/:id` 或 `/api/trailer/:id`，携带 Bearer token；`router.check_auth()` 校验（无论 protect 开关均强制）。
-2. `config.to_cids()` 将番号转为多个候选 CID，随后逐一对 DMM CDN 做 `Range: bytes=0-1023` 的快速存在性探测（`web.lua`），命中第一个可用项。
-3. 构建响应：直接 CDN 直链 + 本机代理路径。当 `DMM_API_PROTECT=on` 时，代理路径经 `sign.lua` 绑定 `HMAC-SHA256(token, uri..":"..exp)` 签名并附 `exp`。
-4. 客户端访问 `/proxy/*` 时：
+1. 客户端请求 `/api/cover/:id`、`/api/film_sample/:id` 或 `/api/trailer/:id`，携带 Bearer token；`router.check_auth()` 校验（无论 protect 开关均强制）。
+2. `config.to_cids()` 将番号转为多个候选 CID。
+3. 构建响应：直接 CDN 直链 + 本机代理路径。数据来源两种：
+   - **封面 / 预告片**：逐一对 DMM CDN 做 `Range: bytes=0-1023` 的快速存在性探测（`web.lua`），命中第一个可用项
+   - **剧照**：通过 FANZA TV GraphQL API（`api.tv.dmm.co.jp/graphql`）一次返回该 CID 的全部剧照
+   当 `DMM_API_PROTECT=on` 时，代理路径经 `sign.lua` 绑定 `HMAC-SHA256(token, uri..":"..exp)` 签名并附 `exp`。
+4. 客户端访问 `/proxy/*` 时（**无论 protect 开关，均先要求 Bearer token**，`access.require_token()`）：
+   - `access.require_token()`：始终校验 `Authorization: Bearer <token>`
    - `access.gate()`：on 时执行 IP 白名单 + 固定窗口限流（`ngx.shared.rate_limit`）
    - `access.require_sig()`：on 时校验签名与过期时间
 5. nginx `proxy_pass` 转发到对应 DMM CDN，视频流关闭缓冲（支持拖动），图片按需转发。
+6. 容器启动时 `entrypoint.sh` 检测证书：证书存在则额外启用 HTTPS(443) server 块（`include dmm.d/ssl.conf`），否则仅监听 HTTP(80)。
 
 ### 签名校验细节（`sign.lua`）
 
@@ -242,15 +318,15 @@ Authorization: Bearer <token>
 ## 安全提醒
 
 - **生产必备**：设置强 `DMM_AUTH_TOKEN`（`openssl rand -hex 32`），并用 `DMM_ALLOW_IPS` 收紧到可信来源；把 `DMM_API_PROTECT` 保持为 `on`
-- `DMM_API_PROTECT=off` 仅用于内网/调试环境——此时 `/proxy/*` 完全无签名与限流，链接一旦泄露可被任意转发
+- `DMM_API_PROTECT=off` 仅用于内网/调试环境——此时 `/proxy/*` 无签名与限流，但**仍要求 Bearer token**，防止匿名转发
 - `/health` 无鉴权，不返回敏感信息，可安全暴露
 
 ---
 
 ## 常见问题
 
-**为什么 `/api/*` 在 off 模式下也要 token？**
-这是刻意设计：`DMM_API_PROTECT` 只控制**代理侧**（`/proxy/*`）的签名、限流与 IP 白名单；`/api/*` 的 token 校验**始终强制**，保证列表接口不被匿名滥用。
+**为什么所有接口（含 `/proxy/*`）都要 token？**
+这是刻意设计：`DMM_API_PROTECT` 只控制 `/proxy/*` 是否需要**签名**、限流与 IP 白名单；而**所有对外接口**（`/api/*` 与 `/proxy/*`）的 **Bearer token 校验始终强制**，保证任何接口都不被匿名滥用。
 
 **改 nginx.conf 后不生效？**
 `conf/nginx.conf` 在 build 时 COPY 进镜像，改动后需 `docker compose up -d --build`。改 `lua/*.lua` 则只需 `docker compose restart`。
@@ -260,3 +336,6 @@ Authorization: Bearer <token>
 
 **视频播放卡顿/无法拖动？**
 确认请求带了 `Range` 头并获得 `206`；`/proxy/video/*` 已关闭缓冲（`proxy_buffering off`）、`proxy_read_timeout 120s`。
+
+**为什么 HTTPS 没生效？**
+`entrypoint.sh` 要求 `/etc/ssl/dmm/` 下同时存在 `fullchain.pem` 与 `privkey.pem` 才开始监听 443。检查：① 证书是否已放入宿主机 `./certs/`；② `docker logs dmm-proxy` 是否显示 `SSL enabled`；③ 证书文件是否有读取权限。

@@ -1,3 +1,15 @@
+# DMM Proxy API - local build
+#
+#   cp .env.example .env                 # then edit .env (set DMM_AUTH_TOKEN)
+#   docker compose up -d --build
+#
+# HTTPS (SSL) - OPTIONAL: put fullchain.pem + privkey.pem into ./certs (or set
+# DMM_SSL_CERTS_DIR). Entrypoint auto-detects them at startup: present -> 443
+# HTTPS enabled, absent -> HTTP only.
+#
+# NOTE: ALL external interfaces (/api/* and /proxy/*) ALWAYS require
+# Authorization: Bearer <DMM_AUTH_TOKEN>. DMM_API_PROTECT only controls whether
+# /proxy/* additionally needs a signature (on) + rate-limit/IP whitelist.
 version: "3.8"
 
 services:

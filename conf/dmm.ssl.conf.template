@@ -1,0 +1,193 @@
+# HTTPS (443) server block — rendered by entrypoint.sh into
+# /usr/local/openresty/nginx/conf/dmm.d/ssl.conf at container startup
+# when the SSL certificate files exist in /etc/ssl/dmm/.
+# WARNING: if you edit the location blocks here, you MUST mirror the changes
+# in the corresponding location blocks inside conf/nginx.conf (the HTTP :80
+# server), since HTTPS reuses an identical copy of the routing logic.
+
+server {
+    listen 443 ssl;
+    server_name _;
+
+    ssl_certificate     /etc/ssl/dmm/fullchain.pem;
+    ssl_certificate_key /etc/ssl/dmm/privkey.pem;
+
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # --- API: Cover ---
+    location ~ ^/api/cover/(?<api_id>[^/]+)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_cover()
+        }
+    }
+
+    # --- API: Trailer ---
+    location ~ ^/api/trailer/(?<api_id>[^/]+)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_trailer()
+        }
+    }
+
+    # --- API: Film Sample ---
+    location ~ ^/api/film_sample/(?<api_id>[^/]+)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_film_sample()
+        }
+    }
+
+    # --- Health check ---
+    location = /health {
+        access_by_lua_block {
+            ngx.say("ok")
+            return ngx.exit(ngx.HTTP_OK)
+        }
+    }
+
+    # --- Proxy DMM standard image CDN (pics.dmm.co.jp) ---
+    location ~ ^/proxy/pics/(?<pics_path>.*)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            access.require_token()
+            access.require_sig()
+        }
+        proxy_pass https://pics.dmm.co.jp/$pics_path$is_args$args;
+        proxy_set_header Host pics.dmm.co.jp;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_ssl_name pics.dmm.co.jp;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 10s;
+    }
+
+    # --- Proxy DMM high-res image CDN (awsimgsrc.dmm.co.jp/pics_dig) ---
+    location ~ ^/proxy/aws/(?<aws_path>.*)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            access.require_token()
+            access.require_sig()
+        }
+        proxy_pass https://awsimgsrc.dmm.co.jp/pics_dig/$aws_path$is_args$args;
+        proxy_set_header Host awsimgsrc.dmm.co.jp;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_ssl_name awsimgsrc.dmm.co.jp;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 10s;
+    }
+
+    # --- Proxy DMM sample image CDN (awsimgsrc.dmm.co.jp/dig_white) ---
+    location ~ ^/proxy/sample/(?<sample_path>.*)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            access.require_token()
+            access.require_sig()
+        }
+        proxy_pass https://awsimgsrc.dmm.co.jp/dig_white/$sample_path$is_args$args;
+        proxy_set_header Host awsimgsrc.dmm.co.jp;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_ssl_name awsimgsrc.dmm.co.jp;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 60s;
+        proxy_send_timeout 10s;
+    }
+
+    # --- Proxy DMM litevideo (sample movie / trailer) CDN (cc3001.dmm.co.jp) ---
+    location ~ ^/proxy/video/(?<video_path>.*)$ {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            access.require_token()
+            access.require_sig()
+        }
+        proxy_pass https://cc3001.dmm.co.jp/$video_path$is_args$args;
+        proxy_set_header Host cc3001.dmm.co.jp;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header User-Agent "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+        proxy_set_header Referer "https://www.dmm.co.jp/";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_ssl_name cc3001.dmm.co.jp;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 120s;
+        proxy_send_timeout 10s;
+
+        proxy_buffering off;
+    }
+
+    # --- Proxy all other requests to DMM ---
+    location / {
+        access_by_lua_block {
+            local access = require "access"
+            access.require_token()
+        }
+        proxy_pass https://pics.dmm.co.jp;
+        proxy_set_header Host pics.dmm.co.jp;
+        proxy_set_header Accept-Encoding "";
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+
+        proxy_ssl_name pics.dmm.co.jp;
+        proxy_ssl_server_name on;
+        proxy_ssl_verify off;
+
+        proxy_connect_timeout 10s;
+        proxy_read_timeout 30s;
+        proxy_send_timeout 10s;
+
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+
+        sub_filter_once off;
+        sub_filter_types *;
+    }
+}

@@ -3,10 +3,10 @@
 # 使用前：
 #   1. 确保服务已启动：docker compose up -d --build
 #   2. 如需更换 host/token，修改下面的变量
-#   3. /api/* 始终需要 token（无论 DMM_API_PROTECT on/off）
-#   4. DMM_API_PROTECT 只影响 /proxy/*：
+#   3. 所有对外接口（/api/* 与 /proxy/*）始终需要 token（无论 DMM_API_PROTECT on/off）
+#   4. DMM_API_PROTECT 只影响 /proxy/* 是否需要签名：
 #        on  -> 必须使用 /api 返回的签名 URL（带 sig/exp），且限流、可选 IP 白名单
-#        off -> 用下面的原始路径即可，不签名
+#        off -> 用下面的原始路径 + token 即可，不签名
 
 @host = http://localhost:8080
 @token = 7966ddc9e82048fc7e03e5d8365954e8
@@ -30,17 +30,20 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/trailer/IPX-535
 Authorization: Bearer {{token}}
 
-### 4. 封面图片代理（仅 DMM_API_PROTECT=off 时直接可用；on 时请用 /api/cover 返回的签名 proxy URL）
+### 4. 封面图片代理（始终需 token；off 时用原始路径，on 时请用 /api/cover 返回的签名 proxy URL）
 # GET /proxy/aws/digital/video/sone00128/sone00128pl.jpg
 # GET /proxy/pics/digital/video/sone00128/sone00128pl.jpg
 
-### 4.1 代理演示（off 模式下的原始路径）
+### 4.1 代理演示（off 模式下的原始路径；始终需 token）
 GET {{host}}/proxy/aws/digital/video/sone00128/sone00128pl.jpg
+Authorization: Bearer {{token}}
 
-### 4.2 代理演示（off 模式下的标准图）
+### 4.2 代理演示（off 模式下的标准图；始终需 token）
 GET {{host}}/proxy/pics/digital/video/sone00128/sone00128pl.jpg
+Authorization: Bearer {{token}}
 
-### 5. 预告片视频流代理（支持 Range 拖动；on 时需签名 URL，off 时用下面的原始路径）
+### 5. 预告片视频流代理（始终需 token；支持 Range 拖动；on 时需签名 URL，off 时用下面的原始路径）
 # on 模式请先从 /api/trailer 拿到带 ?sig=&exp= 的 proxy URL 再请求
 GET {{host}}/proxy/video/litevideo/freepv/i/ipx/ipx00535/ipx00535_mhb_w.mp4
+Authorization: Bearer {{token}}
 Range: bytes=0-1048575
