@@ -95,12 +95,10 @@ Authorization: Bearer <token>
     "hd": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sone00128/sone00128pl.jpg",
     "sd": "https://pics.dmm.co.jp/digital/video/sone00128/sone00128pl.jpg",
     "small": "https://pics.dmm.co.jp/digital/video/sone00128/sone00128pt.jpg",
-    "samples": [],
     "proxy": {
       "hd": "/proxy/aws/digital/video/sone00128/sone00128pl.jpg",
       "sd": "/proxy/pics/digital/video/sone00128/sone00128pl.jpg",
-      "small": "/proxy/pics/digital/video/sone00128/sone00128pt.jpg",
-      "samples_url": "/proxy/pics/digital/video/sone00128/"
+      "small": "/proxy/pics/digital/video/sone00128/sone00128pt.jpg"
     }
   }
 }
@@ -116,9 +114,7 @@ Authorization: Bearer <token>
 | `cover.hd` | 2K 高清封面（`awsimgsrc.dmm.co.jp`），可能不存在 |
 | `cover.sd` | 标准封面（`pics.dmm.co.jp`） |
 | `cover.small` | 小图 `pt.jpg` |
-| `cover.samples` | 剧照列表 `jp-N.jpg`；某些片子命名不同，探测不到会返回空数组 `[]` |
 | `cover.proxy.hd/sd/small` | 经本机代理的路径（客户端据此避开 DMM 地区封锁） |
-| `cover.proxy.samples_url` | 剧照所在目录的代理前缀 |
 
 失败返回 `404`：
 
@@ -128,7 +124,68 @@ Authorization: Bearer <token>
 
 ---
 
-## 3. 预告片信息
+## 3. 剧照（Film Sample）信息
+
+```
+GET /api/film_sample/:id
+```
+
+根据番号返回全部剧照（标准图 + 高清图）的直链与本机代理路径。
+
+> 通过 DMM 官方公开的 **FANZA TV GraphQL API**（`https://api.tv.dmm.co.jp/graphql`）一次性获取全部剧照，无需逐个探测，响应快且可拿到 `2K` 高清大图（`awsimgsrc.dmm.co.jp/dig_white`）。
+
+**示例请求**
+
+```http
+GET http://localhost:8080/api/film_sample/SSIS-497
+Authorization: Bearer <token>
+```
+
+**示例响应 `200`**
+
+```json
+{
+  "id": "SSIS-497",
+  "cid": "ssis00497",
+  "total": 10,
+  "samples": [
+    {
+      "index": 1,
+      "small": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497-1.jpg",
+      "large": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497jp-1.jpg",
+      "proxy": "/proxy/sample/digital/video/ssis00497/ssis00497jp-1.jpg"
+    },
+    {
+      "index": 2,
+      "small": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497-2.jpg",
+      "large": "https://awsimgsrc.dmm.co.jp/dig_white/digital/video/ssis00497/ssis00497jp-2.jpg",
+      "proxy": "/proxy/sample/digital/video/ssis00497/ssis00497jp-2.jpg"
+    }
+  ]
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `id` | 用户传入的番号（大写） |
+| `cid` | 探测命中的 DMM 内容 ID |
+| `total` | 剧照总数 |
+| `samples[].index` | 剧照序号（从 1 开始） |
+| `samples[].small` | 标准剧照直链（`awsimgsrc.dmm.co.jp/dig_white`） |
+| `samples[].large` | 高清剧照直链（`jp-N.jpg`） |
+| `samples[].proxy` | 本机代理路径（推荐使用，可避开地区封锁） |
+
+失败返回 `404`：
+
+```json
+{ "error": "not_found", "message": "No sample images found for id: ABP-477" }
+```
+
+---
+
+## 4. 预告片信息
 
 ```
 GET /api/trailer/:id
@@ -176,7 +233,7 @@ Authorization: Bearer <token>
 
 ---
 
-## 4. 封面图片代理
+## 5. 封面图片代理
 
 ```
 GET /proxy/aws/{path}
@@ -187,7 +244,8 @@ GET /proxy/pics/{path}
 
 | 代理路径 | 上游 CDN |
 |----------|----------|
-| `/proxy/aws/{path}` | `https://awsimgsrc.dmm.co.jp/pics_dig/{path}`（2K 高清） |
+| `/proxy/aws/{path}` | `https://awsimgsrc.dmm.co.jp/pics_dig/{path}`（2K 高清封面） |
+| `/proxy/sample/{path}` | `https://awsimgsrc.dmm.co.jp/dig_white/{path}`（高清剧照） |
 | `/proxy/pics/{path}` | `https://pics.dmm.co.jp/{path}`（标准） |
 
 - `DMM_API_PROTECT=off` 时：直接使用 `/api/cover` 返回的原始 `proxy.*` 路径即可。
@@ -204,7 +262,7 @@ GET /proxy/pics/digital/video/sone00128/sone00128pl.jpg
 
 ---
 
-## 5. 预告片视频流代理
+## 6. 预告片视频流代理
 
 ```
 GET /proxy/video/{path}

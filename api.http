@@ -14,8 +14,12 @@
 ### 1. 健康检查（无需鉴权）
 GET {{host}}/health
 
-### 2. 封面 / 剧照信息（始终需 token；返回的 proxy.* 在 on 时为签名 URL）
-GET {{host}}/api/cover/SONE-128
+### 2. 封面信息（始终需 token；返回的 proxy.* 在 on 时为签名 URL）
+GET {{host}}/api/cover/snos-213
+Authorization: Bearer {{token}}
+
+### 2.1 剧照信息（始终需 token；返回的 proxy 在 on 时为签名 URL）
+GET {{host}}/api/film_sample/snos-213
 Authorization: Bearer {{token}}
 
 ### 3. 预告片信息（始终需 token；返回的 proxy 在 on 时为签名 URL）

@@ -90,6 +90,8 @@ function _M.proxy_path(kind, path)
     local base
     if kind == "aws" then
         base = "/proxy/aws/" .. path
+    elseif kind == "sample" then
+        base = "/proxy/sample/" .. path
     elseif kind == "video" then
         base = "/proxy/video/" .. path
     else
