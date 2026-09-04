@@ -3,7 +3,47 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DMM Daily Updates</title>
+<title>DMM影片每日更新 · 热门排行 | DMM Daily Updates</title>
+
+<!-- SEO / Meta -->
+<meta name="description" content="每日更新 DMM 最热门的影片与新作排行，支持按日期浏览每日上架作品，快速查看封面与样片预览。">
+<meta name="keywords" content="DMM,AV,每日更新,热门排行,新作,影片">
+<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+<meta name="author" content="eulerme">
+<meta name="theme-color" content="#6b9e8a">
+<link rel="canonical" href="https://dmm.example.com/">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="DMM影片每日更新">
+<meta property="og:title" content="DMM影片每日更新 · 热门排行">
+<meta property="og:description" content="每日更新 DMM 最热门的影片与新作排行，支持按日期浏览每日上架作品。">
+<meta property="og:url" content="https://dmm.example.com/">
+<meta property="og:image" content="/favicon.svg">
+<meta property="og:locale" content="zh_CN">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="DMM影片每日更新 · 热门排行">
+<meta name="twitter:description" content="每日更新 DMM 最热门的影片与新作排行。">
+
+<!-- Icons -->
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="apple-touch-icon" href="/favicon.svg">
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "DMM影片每日更新",
+  "alternateName": "DMM Daily Updates",
+  "url": "https://dmm.example.com/",
+  "description": "每日更新 DMM 最热门的影片与新作排行。",
+  "inLanguage": "zh-CN"
+}
+</script>
+
 <style>
   :root {
     --bg: #f7faf8;
@@ -222,74 +262,106 @@
 
   /* ---- timeline ---- */
   .timeline-section {
-    padding: 30px 0 0;
+    padding: 24px 0 0;
   }
   .timeline-wrap {
     position: relative;
     max-width: 1400px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 60px;
   }
   .timeline-track {
-    position: relative;
-    height: 3px;
-    background: var(--border);
-    border-radius: 2px;
-  }
-  .timeline-track::before,
-  .timeline-track::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--primary-light);
-  }
-  .timeline-track::before { left: -4px; }
-  .timeline-track::after  { right: -4px; }
-  .timeline-dots {
     display: flex;
-    justify-content: space-between;
-    position: relative;
-    top: -6px;
+    gap: 6px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    padding: 6px 4px 12px;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--primary-light) transparent;
   }
-  .timeline-dot {
-    width: 15px; height: 15px;
-    border-radius: 50%;
+  .timeline-track:active {
+    cursor: grabbing;
+  }
+  .timeline-track::-webkit-scrollbar {
+    height: 6px;
+  }
+  .timeline-track::-webkit-scrollbar-thumb {
+    background: var(--primary-light);
+    border-radius: 3px;
+  }
+  .timeline-day {
+    flex: 0 0 64px;
+    text-align: center;
+    padding: 8px 0 6px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
     background: var(--card-bg);
-    border: 2.5px solid var(--primary-light);
     cursor: pointer;
-    transition: all .25s;
-    position: relative;
-    z-index: 1;
+    transition: all .2s;
   }
-  .timeline-dot:hover {
-    transform: scale(1.3);
-    border-color: var(--primary);
+  .timeline-day:hover {
+    border-color: var(--primary-light);
+    transform: translateY(-1px);
   }
-  .timeline-dot.active {
+  .timeline-day.is-today .timeline-date::after {
+    content: ' ·';
+    color: var(--accent);
+  }
+  .timeline-day.active {
     background: var(--primary);
     border-color: var(--primary);
-    transform: scale(1.25);
-    box-shadow: 0 0 0 4px rgba(124,154,146,0.2);
+    box-shadow: 0 3px 10px rgba(107,158,138,.25);
   }
-  .timeline-labels {
-    display: flex;
-    justify-content: space-between;
-    padding: 8px 0 0;
+  .timeline-day.active .timeline-date,
+  .timeline-day.active .timeline-dow {
+    color: #fff;
   }
-  .timeline-label {
-    font-size: 11px;
-    color: var(--text-light);
-    width: 15px;
-    text-align: center;
-    cursor: pointer;
-    transition: color .2s;
-  }
-  .timeline-label.active {
-    color: var(--primary-dark);
+  .timeline-date {
+    font-size: 14px;
     font-weight: 600;
+    color: var(--text);
+  }
+  .timeline-dow {
+    font-size: 10px;
+    color: var(--text-light);
+    margin-top: 2px;
+  }
+  .calendar-btn {
+    position: absolute;
+    top: 4px;
+    right: 16px;
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+    border: 1.5px solid var(--primary-light);
+    background: var(--card-bg);
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all .2s;
+    z-index: 2;
+  }
+  .calendar-btn:hover {
+    background: var(--primary-light);
+    transform: scale(1.06);
+  }
+  .calendar-input {
+    position: absolute;
+    top: 42px;
+    right: 16px;
+    width: 0;
+    height: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
   }
 
   /* ---- content area ---- */
@@ -562,6 +634,101 @@
     color: var(--primary-dark);
     white-space: nowrap;
   }
+
+  /* ---- 18+ / NSFW gate ---- */
+  body.gated > *:not(.gate-overlay) {
+    display: none !important;
+  }
+  .gate-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(245,247,250,0.96);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    backdrop-filter: blur(6px);
+  }
+  .gate-overlay.hidden {
+    display: none;
+  }
+  .gate-box {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 12px 40px rgba(61,64,91,.15);
+    max-width: 460px;
+    width: 100%;
+    padding: 36px 32px;
+    text-align: center;
+  }
+  .gate-icon {
+    font-size: 52px;
+    line-height: 1;
+    margin-bottom: 14px;
+  }
+  .gate-box h2 {
+    font-size: 22px;
+    color: var(--text);
+    margin: 0 0 10px;
+  }
+  .gate-msg {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--text-light);
+    margin: 0 0 18px;
+  }
+  .gate-conditions {
+    text-align: left;
+    margin: 0 0 24px;
+    padding: 0 0 0 18px;
+  }
+  .gate-conditions li {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.8;
+  }
+  .gate-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .gate-btn {
+    padding: 11px 20px;
+    border-radius: 12px;
+    border: none;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+  }
+  .gate-btn.enter {
+    background: var(--primary);
+    color: #fff;
+  }
+  .gate-btn.enter:hover {
+    background: var(--primary-dark);
+  }
+  .gate-btn.leave {
+    background: transparent;
+    color: var(--text-light);
+    border: 1.5px solid var(--border);
+  }
+  .gate-btn.leave:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+  .gate-remember {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 18px;
+    font-size: 12px;
+    color: var(--text-light);
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -590,9 +757,9 @@
 <!-- timeline (only for today mode) -->
 <div class="timeline-section" id="timeline-section">
   <div class="timeline-wrap">
-    <div class="timeline-track"></div>
-    <div class="timeline-dots" id="timeline-dots"></div>
-    <div class="timeline-labels" id="timeline-labels"></div>
+    <div class="timeline-track" id="timeline-track"></div>
+    <button class="calendar-btn" onclick="openCalendar()">📅</button>
+    <input type="date" id="calendar-input" class="calendar-input" max="" onchange="onCalendarChange()">
   </div>
 </div>
 
@@ -608,6 +775,28 @@
 <footer class="site-footer">
   <span>Powered by eulerme with ❤️ @2026</span>
 </footer>
+
+<!-- 18+ / NSFW Gate -->
+<div class="gate-overlay" id="gate">
+  <div class="gate-box">
+    <div class="gate-icon">🔞</div>
+    <h2 data-i18n="gate_title">Adult Content Warning</h2>
+    <p class="gate-msg" data-i18n="gate_msg">此网站包含成人内容（NSFW）。仅限年满 18 周岁（或当地法定年龄）的用户访问。请确认你是否已满 18 周岁并同意查看此类内容。</p>
+    <ul class="gate-conditions">
+      <li data-i18n="gate_c1">我已达所在地的法定成人年龄（默认 18 周岁以上）</li>
+      <li data-i18n="gate_c2">我理解并接受本网站包含成人性内容</li>
+      <li data-i18n="gate_c3">在所在地区浏览此类内容不违反当地法律</li>
+    </ul>
+    <div class="gate-actions">
+      <button class="gate-btn enter" onclick="confirmGate()" data-i18n="gate_enter">我已满 18 岁，进入</button>
+      <button class="gate-btn leave" onclick="leaveGate()" data-i18n="gate_leave">离开</button>
+    </div>
+    <label class="gate-remember">
+      <input type="checkbox" id="gate-remember">
+      <span data-i18n="gate_remember">记住我的选择（本机）</span>
+    </label>
+  </div>
+</div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
@@ -646,6 +835,14 @@ const I18N = {
     next: '下一页 →',
     no_img: '暂无图片',
     loading: '加载中...',
+    gate_title: '成人内容警告',
+    gate_msg: '此网站包含成人内容（NSFW），仅限年满 18 周岁（或当地法定成人年龄）的用户访问。请确认你是否已满 18 周岁并同意查看此类内容。',
+    gate_c1: '我已达所在地的法定成人年龄（默认 18 周岁以上）',
+    gate_c2: '我理解并接受本网站包含成人性内容',
+    gate_c3: '在所在地区浏览此类内容不违反当地法律',
+    gate_enter: '我已满 18 岁，进入',
+    gate_leave: '离开',
+    gate_remember: '记住我的选择（本机）',
   },
   en: {
     title: 'DMM Daily Updates',
@@ -663,6 +860,14 @@ const I18N = {
     next: 'Next →',
     no_img: 'No Image',
     loading: 'Loading...',
+    gate_title: 'Adult Content Warning',
+    gate_msg: 'This website contains adult content (NSFW) and is intended for adults aged 18+ (or the legal age in your jurisdiction). Please confirm you are 18 or older and consent to viewing such content.',
+    gate_c1: 'I am at least 18 years old (or the legal age in my jurisdiction)',
+    gate_c2: 'I understand this site contains explicit adult content',
+    gate_c3: 'Viewing such content is legal in my location',
+    gate_enter: 'I am 18+, Enter',
+    gate_leave: 'Leave',
+    gate_remember: 'Remember my choice (this device)',
   },
 };
 let currentLang = localStorage.getItem('lang') || 'zh';
@@ -824,9 +1029,9 @@ function mockTodayData(date, offset, limit) {
 }
 
 function mockRankingData(offset, limit) {
-  const total = 478397;
+  const total = 100;
   const works = [];
-  const end = Math.min(offset + limit, Math.min(total, 90));
+  const end = Math.min(offset + limit, total);
   for (let i = offset; i < end; i++) {
     const mid = MOCK_IDS[i % MOCK_IDS.length];
     const price = [580, 1120, 2180, 2480][i % 4];
@@ -872,7 +1077,7 @@ function mapResponse(data) {
 
 // ========== State ==========
 let currentMode = 'today';
-let currentDateIdx = 0;
+let currentDateIdx = 29;
 let currentPage = 0;
 const PAGE_SIZE = 30;
 let modalImages = [];
@@ -881,35 +1086,85 @@ let modalIdx = 0;
 function getRecentDates() {
   const dates = [];
   const now = new Date();
-  for (let i = 6; i >= 0; i--) {
+  const todayStr = now.toISOString().slice(0,10);
+  for (let i = 29; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86400000);
     dates.push(d.toISOString().slice(0,10));
   }
-  return dates;
+  return { dates, todayStr };
 }
-const DATES = getRecentDates();
+const DATES = getRecentDates().dates;
+const TODAY = getRecentDates().todayStr;
 
 // ========== Timeline ==========
 function renderTimeline() {
-  const dotsEl = document.getElementById('timeline-dots');
-  const labelsEl = document.getElementById('timeline-labels');
-  dotsEl.innerHTML = '';
-  labelsEl.innerHTML = '';
+  const track = document.getElementById('timeline-track');
+  track.innerHTML = '';
   DATES.forEach((d, i) => {
-    const dot = document.createElement('div');
-    dot.className = 'timeline-dot' + (i === currentDateIdx ? ' active' : '');
-    dot.onclick = () => selectDate(i);
-    dotsEl.appendChild(dot);
-    const label = document.createElement('div');
-    label.className = 'timeline-label' + (i === currentDateIdx ? ' active' : '');
-    label.textContent = d.slice(5);
-    label.onclick = () => selectDate(i);
-    labelsEl.appendChild(label);
+    const isToday = d === TODAY;
+    const day = document.createElement('div');
+    day.className = 'timeline-day' + (i === currentDateIdx ? ' active' : '') + (isToday ? ' is-today' : '');
+    day.innerHTML =
+      `<div class="timeline-date">${d.slice(5)}</div>` +
+      `<div class="timeline-dow">${['日','一','二','三','四','五','六'][new Date(d + 'T00:00:00').getDay()]}</div>`;
+    day.onclick = () => selectDate(i);
+    track.appendChild(day);
   });
+  scrollToActive();
+}
+
+function scrollToActive() {
+  const track = document.getElementById('timeline-track');
+  const active = track.querySelector('.timeline-day.active');
+  if (active) {
+    active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+}
+
+// drag-to-scroll
+let dragStartX = 0, dragScrollLeft = 0, dragging = false;
+function initDrag() {
+  const track = document.getElementById('timeline-track');
+  track.addEventListener('pointerdown', e => {
+    dragging = true;
+    dragStartX = e.clientX;
+    dragScrollLeft = track.scrollLeft;
+    track.setPointerCapture(e.pointerId);
+  });
+  track.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    e.preventDefault();
+    track.scrollLeft = dragScrollLeft - (e.clientX - dragStartX);
+  });
+  const endDrag = () => { dragging = false; };
+  track.addEventListener('pointerup', endDrag);
+  track.addEventListener('pointercancel', endDrag);
 }
 
 function selectDate(idx) {
   currentDateIdx = idx;
+  currentPage = 0;
+  renderTimeline();
+  loadTodayData();
+}
+
+function openCalendar() {
+  const input = document.getElementById('calendar-input');
+  input.value = DATES[currentDateIdx];
+  if (typeof input.showPicker === 'function') {
+    input.showPicker();
+  } else {
+    input.click();
+  }
+}
+function onCalendarChange() {
+  const input = document.getElementById('calendar-input');
+  const val = input.value;
+  if (!val) return;
+  if (val > TODAY) { input.value = TODAY; return; }
+  DATES.push(val);
+  DATES.sort();
+  currentDateIdx = DATES.indexOf(val);
   currentPage = 0;
   renderTimeline();
   loadTodayData();
@@ -1075,11 +1330,44 @@ function switchMode(mode) {
   loadCurrentData();
 }
 
+// ========== 18+ / NSFW Gate ==========
+function confirmGate() {
+  if (document.getElementById('gate-remember').checked) {
+    localStorage.setItem('dm9_age_ok', '1');
+  }
+  document.getElementById('gate').classList.add('hidden');
+  document.body.classList.remove('gated');
+  initApp();
+}
+
+function leaveGate() {
+  window.location.href = 'about:blank';
+}
+
+function checkGate() {
+  const already = localStorage.getItem('dm9_age_ok') === '1';
+  if (already) {
+    document.getElementById('gate').classList.add('hidden');
+    document.body.classList.remove('gated');
+    initApp();
+  } else {
+    document.body.classList.add('gated');
+    document.documentElement.style.overflow = 'hidden';
+  }
+}
+
 // ========== Init ==========
-applyTheme();
-applyLang();
-renderTimeline();
-loadTodayData();
+function initApp() {
+  document.documentElement.style.overflow = '';
+  document.getElementById('calendar-input').max = TODAY;
+  renderTimeline();
+  applyTheme();
+  applyLang();
+  initDrag();
+  loadTodayData();
+}
+
+checkGate();
 </script>
 </body>
 </html>

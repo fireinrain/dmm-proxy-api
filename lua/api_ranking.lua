@@ -144,11 +144,31 @@ local function parse_int_param(raw, default_val)
     return n
 end
 
+local MAX_RANKING = 100
+
 function _M.handle()
     local args = ngx.req.get_uri_args()
 
     local limit = parse_limit(args.limit)
     local offset = parse_int_param(args.offset, 0)
+
+    if offset >= MAX_RANKING then
+        ngx.status = 200
+        ngx.header["Content-Type"] = "application/json; charset=utf-8"
+        ngx.say(cjson.encode({
+            total = MAX_RANKING,
+            limit = limit,
+            offset = offset,
+            hasNext = false,
+            count = 0,
+            works = cjson.empty_array,
+        }))
+        return
+    end
+
+    if offset + limit > MAX_RANKING then
+        limit = MAX_RANKING - offset
+    end
 
     local result, err = fetch_ranking(offset, limit)
     if not result then
@@ -232,10 +252,10 @@ function _M.handle()
     ngx.status = 200
     ngx.header["Content-Type"] = "application/json; charset=utf-8"
     ngx.say(cjson.encode({
-        total = page.totalCount or #works,
-        limit = page.limit or limit,
-        offset = page.offset or offset,
-        hasNext = page.hasNext or false,
+        total = MAX_RANKING,
+        limit = limit,
+        offset = offset,
+        hasNext = (offset + #works) < MAX_RANKING,
         count = #works,
         works = works,
     }))
