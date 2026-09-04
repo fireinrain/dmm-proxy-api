@@ -410,6 +410,7 @@
     object-fit: cover;
     background: var(--border);
     display: block;
+    cursor: zoom-in;
   }
   .card-body {
     padding: 14px 16px 16px;
@@ -434,6 +435,27 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     margin-bottom: 8px;
+  }
+  .card-sub {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .card-id {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--primary-dark);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    letter-spacing: 0.2px;
+  }
+  .card-date {
+    font-size: 11px;
+    color: var(--text-light);
+    background: rgba(232,168,124,0.12);
+    padding: 2px 8px;
+    border-radius: 8px;
   }
   .card-meta {
     display: flex;
@@ -624,7 +646,18 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .modal-text {
     flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .modal-sub {
+    font-size: 11px;
+    color: var(--text-light);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   }
   .modal-badge {
     font-size: 11px;
@@ -809,7 +842,10 @@
     </div>
     <div class="modal-footer">
       <span class="modal-counter" id="modal-counter">1 / 1</span>
-      <span class="modal-title" id="modal-title"></span>
+      <div class="modal-text">
+        <span class="modal-title" id="modal-title"></span>
+        <span class="modal-sub" id="modal-sub"></span>
+      </div>
       <span class="modal-badge" id="modal-badge"></span>
     </div>
   </div>
@@ -1197,6 +1233,11 @@ function openModal(work) {
   modalIdx = 0;
   document.getElementById('modal').classList.add('open');
   document.body.style.overflow = 'hidden';
+  const tag = [];
+  if (work.code) tag.push(work.code);
+  if (work.date) tag.push(work.date);
+  document.getElementById('modal-title').textContent = work.title || '';
+  document.getElementById('modal-sub').textContent = tag.join(' · ');
   updateModal();
 }
 function closeModal() {
@@ -1251,12 +1292,21 @@ function renderCards(data) {
       : '';
     const bookmarkHtml = isRanking && w.bookmarkCount
       ? `<span class="card-tag">♥ ${w.bookmarkCount.toLocaleString()}</span>` : '';
+    const code = cidToCode(w.id);
+    const codeHtml = code ? `<span class="card-id">${escHtml(code)}</span>` : '';
+    const dateHtml = w.deliveryStartAt ? `<span class="card-date">${escHtml(fmtRelease(w.deliveryStartAt))}</span>` : '';
     return `
-      <div class="card fade-in" style="animation-delay:${i*30}ms" onclick='openModal(${escAttr(JSON.stringify({images:w.images||[],title:w.title}))})'>
-        <img class="card-img" src="${w.cover.medium || w.cover.large || ''}" alt="" loading="lazy" onerror="this.style.background='linear-gradient(135deg,var(--border),var(--border))'">
+      <div class="card fade-in" style="animation-delay:${i*30}ms">
+        <img class="card-img" src="${w.cover.medium || w.cover.large || ''}" alt="${escAttr(w.title || '')}" loading="lazy"
+          onclick='openModal(${escAttr(JSON.stringify({images:w.images||[],title:w.title,code,date:fmtRelease(w.deliveryStartAt)}))})'
+          onerror="this.style.background='linear-gradient(135deg,var(--border),var(--border))'">
         <div class="card-body">
           ${rankHtml}
           <div class="card-title">${escHtml(w.title)}</div>
+          <div class="card-sub">
+            ${codeHtml}
+            ${dateHtml}
+          </div>
           <div class="card-meta">
             <span class="card-tag">${escHtml(w.maker?.name || '')}</span>
             ${actresses ? `<span class="card-tag">${escHtml(actresses)}</span>` : ''}
@@ -1268,6 +1318,30 @@ function renderCards(data) {
       </div>`;
   }).join('');
   renderPagination(data);
+}
+
+function fmtRelease(s) {
+  return String(s || '').slice(0, 10);
+}
+
+// Convert a DMM CID (e.g. "1dldss00515", "h_086jrze00318") to its 番号 code:
+// uppercase maker + "-" + serial number.
+// Serial leading zeros are stripped, but the result must stay at least 3 digits,
+// so zeros are re-added only when the effective value would be shorter than 3.
+// e.g. 1dldss00515 -> DLDSS-515, 1fns00241 -> FNS-241, 1abc00100 -> ABC-100, 1abc10 -> ABC-010
+function cidToCode(cid) {
+  let s = String(cid || '').trim().toLowerCase();
+  if (!s) return '';
+  if (s.startsWith('h_')) s = s.slice(2);
+  const m = s.match(/(\d+)$/);
+  const num = m ? m[1] : '';
+  const rest = num ? s.slice(0, s.length - num.length) : s;
+  const maker = rest.replace(/^\d+/, '').toUpperCase();
+  if (!maker) return cid;
+  let digits = num.replace(/^0+/, '');
+  if (!digits) digits = '0';
+  while (digits.length < 3) digits = '0' + digits;
+  return maker + '-' + digits;
 }
 
 function escHtml(s) {
