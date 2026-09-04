@@ -1083,13 +1083,20 @@ const PAGE_SIZE = 30;
 let modalImages = [];
 let modalIdx = 0;
 
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 function getRecentDates() {
   const dates = [];
   const now = new Date();
-  const todayStr = now.toISOString().slice(0,10);
+  const todayStr = fmtDate(now);
   for (let i = 29; i >= 0; i--) {
     const d = new Date(now.getTime() - i * 86400000);
-    dates.push(d.toISOString().slice(0,10));
+    dates.push(fmtDate(d));
   }
   return { dates, todayStr };
 }
@@ -1122,23 +1129,34 @@ function scrollToActive() {
 }
 
 // drag-to-scroll
-let dragStartX = 0, dragScrollLeft = 0, dragging = false;
+let dragStartX = 0, dragScrollLeft = 0, dragging = false, dragged = false;
 function initDrag() {
   const track = document.getElementById('timeline-track');
   track.addEventListener('pointerdown', e => {
     dragging = true;
+    dragged = false;
     dragStartX = e.clientX;
     dragScrollLeft = track.scrollLeft;
-    track.setPointerCapture(e.pointerId);
   });
-  track.addEventListener('pointermove', e => {
+  window.addEventListener('pointermove', e => {
     if (!dragging) return;
-    e.preventDefault();
-    track.scrollLeft = dragScrollLeft - (e.clientX - dragStartX);
+    const dx = e.clientX - dragStartX;
+    if (Math.abs(dx) > 5) {
+      dragged = true;
+      track.scrollLeft = dragScrollLeft - dx;
+    }
   });
-  const endDrag = () => { dragging = false; };
-  track.addEventListener('pointerup', endDrag);
-  track.addEventListener('pointercancel', endDrag);
+  window.addEventListener('pointerup', () => { dragging = false; });
+  window.addEventListener('pointercancel', () => { dragging = false; });
+
+  // suppress the click that follows a real drag, so day selection still works
+  track.addEventListener('click', e => {
+    if (dragged) {
+      e.stopPropagation();
+      e.preventDefault();
+      dragged = false;
+    }
+  }, true);
 }
 
 function selectDate(idx) {
@@ -1162,8 +1180,10 @@ function onCalendarChange() {
   const val = input.value;
   if (!val) return;
   if (val > TODAY) { input.value = TODAY; return; }
-  DATES.push(val);
-  DATES.sort();
+  if (!DATES.includes(val)) {
+    DATES.push(val);
+    DATES.sort();
+  }
   currentDateIdx = DATES.indexOf(val);
   currentPage = 0;
   renderTimeline();
