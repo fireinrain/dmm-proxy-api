@@ -81,6 +81,50 @@ server {
         }
     }
 
+    # --- API: Today Update ---
+    location = /api/todayupdate {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_todayupdate()
+        }
+    }
+
+    # --- API: Ranking ---
+    location = /api/ranking {
+        access_by_lua_block {
+            local access = require "access"
+            access.gate()
+            local router = require "router"
+            router.check_auth()
+        }
+        content_by_lua_block {
+            local router = require "router"
+            router.handle_ranking()
+        }
+    }
+
+    # --- Frontend: serve index.html at root ---
+    location = / {
+        root /etc/openresty/static;
+        try_files /index.html =404;
+    }
+
+    # --- Frontend: config.js with token injection ---
+    location = /config.js {
+        content_by_lua_block {
+            local token = os.getenv("DMM_AUTH_TOKEN") or ""
+            ngx.header["Content-Type"] = "application/javascript; charset=utf-8"
+            ngx.header["Cache-Control"] = "no-store"
+            ngx.say("window.__API_TOKEN__ = '" .. token .. "';")
+        }
+    }
+
     # --- Proxy DMM standard image CDN (pics.dmm.co.jp) ---
     location ~ ^/proxy/pics/(?<pics_path>.*)$ {
         access_by_lua_block {
