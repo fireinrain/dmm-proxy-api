@@ -430,6 +430,18 @@
     font-size: 14px;
   }
 
+  /* ---- footer / copyright ---- */
+  .site-footer {
+    position: fixed;
+    right: 16px;
+    bottom: 10px;
+    font-size: 11px;
+    color: var(--text-light);
+    opacity: .8;
+    z-index: 5;
+    user-select: none;
+  }
+
   /* ---- fade in ---- */
   .fade-in {
     animation: fadeIn .35s ease;
@@ -592,6 +604,10 @@
   <div class="cards" id="cards"></div>
   <div class="pagination" id="pagination"></div>
 </div>
+
+<footer class="site-footer">
+  <span>Powered by eulerme with ❤️ @2026</span>
+</footer>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
