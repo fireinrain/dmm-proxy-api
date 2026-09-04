@@ -76,41 +76,48 @@ local function fetch_daily(date, offset, limit)
         query = QUERY,
     })
 
-    local httpc = http.new()
-    httpc:set_timeout(15000)
-    local res, err = httpc:request_uri(ENDPOINT, {
-        method = "POST",
-        ssl_verify = false,
-        headers = {
-            ["Content-Type"] = "application/json",
-            ["User-Agent"] = config.WEB.ua,
-            ["Origin"] = "https://video.dmm.co.jp",
-            ["Referer"] = "https://video.dmm.co.jp/",
-        },
-        body = payload,
-    })
-    if not res then
-        return nil, err
-    end
-    if res.status ~= 200 then
-        return nil, "graphql status " .. res.status
+    local last_err
+    for attempt = 1, 2 do
+        local httpc = http.new()
+        httpc:set_timeout(15000)
+        local res, err = httpc:request_uri(ENDPOINT, {
+            method = "POST",
+            ssl_verify = false,
+            headers = {
+                ["Content-Type"] = "application/json",
+                ["User-Agent"] = config.WEB.ua,
+                ["Origin"] = "https://video.dmm.co.jp",
+                ["Referer"] = "https://video.dmm.co.jp/",
+            },
+            body = payload,
+        })
+        if not res then
+            last_err = err
+            ngx.sleep(0.5)
+        elseif res.status ~= 200 then
+            last_err = "graphql status " .. res.status
+            ngx.sleep(0.5)
+        else
+            local ok, data = pcall(cjson.decode, res.body)
+            if not ok or type(data) ~= "table" then
+                last_err = "invalid json response"
+                ngx.sleep(0.5)
+            elseif data.errors then
+                last_err = "graphql error: " .. (data.errors[1] and data.errors[1].message or "unknown")
+                ngx.sleep(0.5)
+            else
+                local ppv = data.data and data.data.legacySearchPPV
+                if not ppv or not ppv.result then
+                    last_err = "unexpected response structure"
+                    ngx.sleep(0.5)
+                else
+                    return ppv.result
+                end
+            end
+        end
     end
 
-    local ok, data = pcall(cjson.decode, res.body)
-    if not ok or type(data) ~= "table" then
-        return nil, "invalid json response"
-    end
-
-    if data.errors then
-        return nil, "graphql error: " .. (data.errors[1] and data.errors[1].message or "unknown")
-    end
-
-    local ppv = data.data and data.data.legacySearchPPV
-    if not ppv or not ppv.result then
-        return nil, "unexpected response structure"
-    end
-
-    return ppv.result
+    return nil, last_err
 end
 
 local function parse_date_param(raw)

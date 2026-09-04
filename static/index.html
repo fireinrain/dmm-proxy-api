@@ -848,14 +848,6 @@ function mockRankingData(offset, limit) {
 }
 
 // ========== API Helper ==========
-async function fetchAPI(url) {
-  const token = window.__API_TOKEN__ || '';
-  const res = await fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + token },
-  });
-  if (!res.ok) throw new Error('API ' + res.status);
-  return res.json();
-}
 
 // Map API work → frontend format (sampleImages → images for modal)
 function mapWork(w) {
@@ -977,7 +969,7 @@ function renderCards(data) {
   countEl.textContent = t('total', data.total);
 
   container.innerHTML = data.works.map((w, i) => {
-    const actresses = (w.actresses || []).map(a => a.name).join(' / ');
+    const actresses = Array.isArray(w.actresses) ? w.actresses.map(a => a && a.name).filter(Boolean).join(' / ') : '';
     const rankHtml = isRanking ? `<div class="card-rank">#${w.rank}</div>` : '';
     const priceHtml = w.price
       ? `<div class="card-price">${w.price.price}円${w.price.discountPrice ? `<span class="original">${w.price.discountPrice}円</span>` : ''}</div>`
@@ -986,7 +978,7 @@ function renderCards(data) {
       ? `<span class="card-tag">♥ ${w.bookmarkCount.toLocaleString()}</span>` : '';
     return `
       <div class="card fade-in" style="animation-delay:${i*30}ms" onclick='openModal(${escAttr(JSON.stringify({images:w.images||[],title:w.title}))})'>
-        <img class="card-img" src="${w.cover.large || w.cover.medium || ''}" alt="" onerror="this.style.background='linear-gradient(135deg,var(--border),var(--border))'">
+        <img class="card-img" src="${w.cover.medium || w.cover.large || ''}" alt="" loading="lazy" onerror="this.style.background='linear-gradient(135deg,var(--border),var(--border))'">
         <div class="card-body">
           ${rankHtml}
           <div class="card-title">${escHtml(w.title)}</div>
@@ -1027,31 +1019,45 @@ function prevPage() { if (currentPage > 0) { currentPage--; loadCurrentData(); }
 function nextPage() { currentPage++; loadCurrentData(); }
 
 // ========== Data Loading ==========
+let loadSeq = 0;
+let abortCtrl = null;
+
+function loadData(url) {
+  const seq = ++loadSeq;
+  if (abortCtrl) abortCtrl.abort();
+  abortCtrl = new AbortController();
+  const container = document.getElementById('cards');
+  container.innerHTML = `<div class="status-msg">${t('loading')}</div>`;
+  return fetch(url, {
+    headers: { 'Authorization': 'Bearer ' + (window.__API_TOKEN__ || '') },
+    signal: abortCtrl.signal,
+  })
+    .then(res => {
+      if (!res.ok) throw new Error('API ' + res.status);
+      return res.json();
+    })
+    .then(data => {
+      if (seq !== loadSeq) return;
+      renderCards(mapResponse(data));
+    })
+    .catch(e => {
+      if (e.name === 'AbortError' || seq !== loadSeq) return;
+      console.warn('API unavailable, using mock data:', e.message);
+      renderCards(currentMode === 'today'
+        ? mockTodayData(DATES[currentDateIdx], currentPage * PAGE_SIZE, PAGE_SIZE)
+        : mockRankingData(currentPage * PAGE_SIZE, PAGE_SIZE));
+    });
+}
+
 async function loadTodayData() {
   const date = DATES[currentDateIdx];
   const offset = currentPage * PAGE_SIZE;
-  const container = document.getElementById('cards');
-  container.innerHTML = `<div class="status-msg">${t('loading')}</div>`;
-  try {
-    const data = await fetchAPI(`/api/todayupdate?date=${date}&offset=${offset}&limit=${PAGE_SIZE}`);
-    renderCards(mapResponse(data));
-  } catch (e) {
-    console.warn('API unavailable, using mock data:', e.message);
-    renderCards(mockTodayData(date, offset, PAGE_SIZE));
-  }
+  loadData(`/api/todayupdate?date=${date}&offset=${offset}&limit=${PAGE_SIZE}`);
 }
 
 async function loadRankingData() {
   const offset = currentPage * PAGE_SIZE;
-  const container = document.getElementById('cards');
-  container.innerHTML = `<div class="status-msg">${t('loading')}</div>`;
-  try {
-    const data = await fetchAPI(`/api/ranking?offset=${offset}&limit=${PAGE_SIZE}`);
-    renderCards(mapResponse(data));
-  } catch (e) {
-    console.warn('API unavailable, using mock data:', e.message);
-    renderCards(mockRankingData(offset, PAGE_SIZE));
-  }
+  loadData(`/api/ranking?offset=${offset}&limit=${PAGE_SIZE}`);
 }
 function loadCurrentData() {
   currentMode === 'today' ? loadTodayData() : loadRankingData();
