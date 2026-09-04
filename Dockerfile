@@ -13,7 +13,8 @@ COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN mkdir -p /var/log/openresty \
     && chmod +x /usr/local/bin/entrypoint.sh \
-    && mkdir -p /etc/ssl/dmm
+    && mkdir -p /etc/ssl/dmm \
+    && mkdir -p /etc/openresty/static
 
 EXPOSE 80 443
 

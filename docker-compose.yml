@@ -30,5 +30,6 @@ services:
       - DMM_CERT_KEY=${DMM_CERT_KEY:-private.key}
     volumes:
       - ./lua:/etc/openresty/lua/:ro
+      - ./static:/etc/openresty/static/:ro
       - ${DMM_SSL_CERTS_DIR:-./certs}:/etc/ssl/dmm:ro
     restart: unless-stopped

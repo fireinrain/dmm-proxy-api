@@ -11,12 +11,17 @@
 - **封面 / 剧照**：`/api/cover/:id` 返回 2K 高清封面（`awsimgsrc`）、标准封面与直链及代理路径；`/api/film_sample/:id` 通过 DMM 官方 FANZA TV GraphQL API 一次性返回全部高清剧照
 - **预告片**：`/api/trailer/:id` 返回多个码率预告片的直链及代理路径；探测从最高档（`hhb`/1080p）开始，只返回最高三档
 - **预告片直链**：`/api/trailer_direct/:id` 并发请求 AVWikiDB / DMM / JAVDatabase，谁先成功用谁，并带 `source`；命中结果缓存 7 天（`lua_shared_dict`）
+- **每日更新列表**：`/api/todayupdate` 通过 DMM FANZA GraphQL API 获取每日更新的作品列表，支持按日期查询、分页
+- **热门排行榜**：`/api/ranking` 按销售排名分数返回热门作品，支持分页
+- **前端浏览界面**：内置 SPA 单页应用（`/`），支持今日更新时间线、热门排行榜浏览，卡片点击可弹窗预览封面与剧照大图，支持左右键盘导航
+- **多配色主题**：6 套小清新配色方案（薄荷绿 / 樱花粉 / 薰衣草 / 海洋蓝 / 暖杏色 / 夜猫黑），一键切换，自动保存
+- **中英双语**：界面支持中文 / English 切换，自动保存偏好
 - **智能 CID 探测**：番号（如 `ABP-477`）自动转成 DMM 内部多个候选 CID（如 `abp00477`、`abp0477`、`1abp477`）逐一探测，命中第一个可用项
 - **快速存在性探测**：用 `Range: bytes=0-1023` 请求，接受 `200/206/416`，探测预告片由 37s 降到约 1s
 - **流式视频代理**：`/proxy/video/*` 支持 HTTP Range，可在播放器内拖动进度条；自动带浏览器 UA 与 DMM 的 `Referer` 避免 CDN 403
 - **可选 HTTPS (SSL)**：证书目录存在即自动启用 443；无证书则纯 HTTP，开箱即用
 - **防滥用**：
-  - **`/api/*`**（cover/trailer/film_sample）**始终**需要 `Authorization: Bearer <token>`
+  - **`/api/*`**（cover/trailer/film_sample/todayupdate/ranking）**始终**需要 `Authorization: Bearer <token>`
   - `DMM_API_PROTECT=on` 时，`/api/*` 返回的 `proxy.*` 附带 `DMM_SIGN_TTL` 秒内有效的 **HMAC-SHA256 签名 URL**；`/proxy/*` 需凭该签名访问，并有单 IP 限流与可选 IP 白名单
   - `DMM_API_PROTECT=off` 时，`/api/*` 返回的 `proxy.*` 为普通路径（无签名），`/proxy/*` 完全开放
 
@@ -46,8 +51,12 @@ dmm-proxy-api/
 │   ├── web.lua             # 基于 vendored lua-resty-http 的探测与抓取
 │   ├── api_cover.lua       # /api/cover 实现
 │   ├── api_film_sample.lua # /api/film_sample 实现（FANZA TV GraphQL）
-│   └── api_trailer.lua     # /api/trailer 实现
-│   └── api_trailer_direct.lua # /api/trailer_direct 实现（多源并发 + 7 天缓存）
+│   ├── api_trailer.lua     # /api/trailer 实现
+│   ├── api_trailer_direct.lua # /api/trailer_direct 实现（多源并发 + 7 天缓存）
+│   ├── api_todayupdate.lua # /api/todayupdate 实现（每日更新列表）
+│   └── api_ranking.lua     # /api/ranking 实现（热门排行榜）
+├── static/                 # 前端静态文件（docker volume 挂载，改后刷新即可）
+│   └── index.html          # SPA 单页应用（今日更新 / 排行榜 / 主题切换 / 多语言）
 └── vendor/resty/           # 本地 vendor 的 lua-resty-http（纯 Lua，无需额外依赖）
 ```
 
@@ -73,7 +82,7 @@ cp .env.example .env
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `DMM_AUTH_TOKEN` | `change-me-in-production` | `/api/*` 的 Bearer token，同时作为签名 URL 的 HMAC 密钥。**生产必改**：`openssl rand -hex 32` |
+| `DMM_AUTH_TOKEN` | `change-me-in-production` | `/api/*` 的 Bearer token，同时作为签名 URL 的 HMAC 密钥，也是 `/config.js` 注入前端的 token 值。**生产必改**：`openssl rand -hex 32` |
 | `DMM_API_PROTECT` | `on` | 代理侧防滥用总开关，`on/true/1/yes` 开启，`off/空` 关闭。`on` 时 `/api/*` 返回的 proxy 附带签名+时效，`/proxy/*` 需凭签名访问且有限流/IP 白名单；`off` 时 proxy 无签名、`/proxy/*` 完全开放 |
 | `DMM_SIGN_TTL` | `220` | on 时签名 URL 的有效秒数 |
 | `DMM_RATE_PER_MIN` | `240` | on 时单 IP 每分钟请求上限 |
@@ -96,6 +105,7 @@ curl http://localhost:8080/health    # -> ok
 > 说明：
 > - `conf/nginx.conf` 在 build 时被 COPY 进镜像，改动后需 `docker compose up -d --build`
 > - `lua/` 通过 volume 挂载进容器（`./lua:/etc/openresty/lua/:ro`），改逻辑后执行 `docker compose restart`（reload worker）即可
+> - `static/` 通过 volume 挂载进容器（`./static:/etc/openresty/static/:ro`），改前端文件后刷新浏览器即可，无需重启容器
 
 ### 5. 启用 HTTPS (SSL)（可选）
 
@@ -140,6 +150,12 @@ docker compose -f docker-compose.hub.yml up -d
 ```bash
 HEADER="Authorization: Bearer <你的DMM_AUTH_TOKEN>"
 
+# 前端界面
+curl -s http://localhost:8080/           # -> index.html
+
+# 前端配置（token 注入）
+curl -s http://localhost:8080/config.js  # -> window.__API_TOKEN__ = '...';
+
 # 封面
 curl -s -H "$HEADER" http://localhost:8080/api/cover/SONE-128
 
@@ -148,6 +164,12 @@ curl -s -H "$HEADER" http://localhost:8080/api/film_sample/SSIS-497
 
 # 预告片
 curl -s -H "$HEADER" http://localhost:8080/api/trailer/SSIS-497
+
+# 每日更新列表
+curl -s -H "$HEADER" http://localhost:8080/api/todayupdate
+
+# 热门排行榜
+curl -s -H "$HEADER" http://localhost:8080/api/ranking
 ```
 
 ---
@@ -181,6 +203,13 @@ curl -s -H "$HEADER" http://localhost:8080/api/trailer/SSIS-497
 GET /health
 ```
 无需鉴权，返回 `ok`。
+
+### 前端配置
+
+```
+GET /config.js
+```
+无需鉴权。Lua handler 将 `DMM_AUTH_TOKEN` 环境变量注入为 `window.__API_TOKEN__`，前端据此调用 `/api/*`。`Cache-Control: no-store`。
 
 ### 封面 / 剧照
 
@@ -258,6 +287,109 @@ Authorization: Bearer <token>
 
 > 预告片码率档位：`sm`(300k) / `dm`(1000k) / `dmb`(1500k) / `mhb`(2500k)，仅返回探测存在的档位。
 
+### 每日更新列表
+
+```
+GET /api/todayupdate
+Authorization: Bearer <token>
+```
+
+通过 DMM FANZA GraphQL API 获取每日更新的作品列表。支持按日期查询与分页。
+
+```http
+# 今日更新
+GET http://localhost:8080/api/todayupdate
+Authorization: Bearer <token>
+
+# 指定日期 + 分页
+GET http://localhost:8080/api/todayupdate?date=2026-09-03&limit=120&offset=0
+Authorization: Bearer <token>
+```
+
+**响应 `200`（节选）**
+
+```json
+{
+  "date": "2026-09-03",
+  "total": 99,
+  "limit": 30,
+  "offset": 0,
+  "hasNext": true,
+  "count": 30,
+  "works": [
+    {
+      "id": "1fns00241",
+      "title": "雪国育ちの色白スレンダーBODYを性感開発する初イキッ3本番！ 柏木雫",
+      "cover": { "medium": "...", "large": "..." },
+      "deliveryStartAt": "2026-09-03T00:00:59+09:00",
+      "actresses": [{ "id": "1112624", "name": "柏木雫" }],
+      "maker": { "id": "40488", "name": "FALENO" },
+      "isOnSale": true,
+      "review": { "average": 5, "count": 1 },
+      "releaseStatus": "LATEST_RELEASE",
+      "price": { "productId": "1fns00241dl", "price": 2480, "discountPrice": null },
+      "hasMultiplePrices": true,
+      "sampleMovie": { "mp4": "...", "hls": "..." },
+      "sampleImages": [{ "number": 1, "largeUrl": "..." }]
+    }
+  ]
+}
+```
+
+参数：`date`(YYYY-MM-DD，默认今日 JST)、`limit`(30/60/120，默认 30)、`offset`(默认 0)。
+
+### 热门排行榜
+
+```
+GET /api/ranking
+Authorization: Bearer <token>
+```
+
+按销售排名分数返回 DMM 热门作品。每条记录包含 `rank` 排名与 `bookmarkCount` 收藏数。
+
+```http
+# 热门 Top 30
+GET http://localhost:8080/api/ranking
+Authorization: Bearer <token>
+
+# 分页
+GET http://localhost:8080/api/ranking?limit=60&offset=30
+Authorization: Bearer <token>
+```
+
+**响应 `200`（节选）**
+
+```json
+{
+  "total": 478397,
+  "limit": 30,
+  "offset": 0,
+  "hasNext": true,
+  "count": 30,
+  "works": [
+    {
+      "rank": 1,
+      "id": "sqte00683",
+      "title": "いつでも使えるオナホ後輩 花守夏歩",
+      "cover": { "medium": "...", "large": "..." },
+      "deliveryStartAt": "2026-05-16T00:00:00+09:00",
+      "actresses": [{ "id": "1099813", "name": "花守夏歩" }],
+      "maker": { "id": "45414", "name": "S-Cute" },
+      "isOnSale": true,
+      "review": { "average": 4.94, "count": 32 },
+      "releaseStatus": "SEMI_NEW_RELEASE",
+      "bookmarkCount": 31336,
+      "price": { "productId": "sqte00683", "price": 580, "discountPrice": 290 },
+      "hasMultiplePrices": true,
+      "sampleMovie": { "mp4": "...", "hls": "..." },
+      "sampleImages": [{ "number": 1, "largeUrl": "..." }]
+    }
+  ]
+}
+```
+
+参数：`limit`(30/60/120，默认 30)、`offset`(默认 0)。
+
 ### 资源代理（`/proxy/*`）
 
 | 路径 | 上游 | 说明 |
@@ -287,17 +419,19 @@ Authorization: Bearer <token>
 
 ## 工作原理
 
-1. 客户端请求 `/api/cover/:id`、`/api/film_sample/:id` 或 `/api/trailer/:id`，携带 Bearer token；`router.check_auth()` 校验（无论 protect 开关均强制）。
-2. `config.to_cids()` 将番号转为多个候选 CID。
-3. 构建响应：直接 CDN 直链 + 本机代理路径。数据来源两种：
+1. 客户端访问 `http://localhost:80`，nginx 返回 `static/index.html`（SPA 前端）。
+2. 前端加载 `/config.js` 获取 API token，据此调用 `/api/todayupdate`、`/api/ranking` 等接口。
+3. 客户端请求 `/api/cover/:id`、`/api/film_sample/:id` 或 `/api/trailer/:id`，携带 Bearer token；`router.check_auth()` 校验（无论 protect 开关均强制）。
+4. `config.to_cids()` 将番号转为多个候选 CID。
+5. 构建响应：直接 CDN 直链 + 本机代理路径。数据来源两种：
    - **封面 / 预告片**：逐一对 DMM CDN 做 `Range: bytes=0-1023` 的快速存在性探测（`web.lua`），命中第一个可用项
    - **剧照**：通过 FANZA TV GraphQL API（`api.tv.dmm.co.jp/graphql`）一次返回该 CID 的全部剧照
    当 `DMM_API_PROTECT=on` 时，代理路径经 `sign.lua` 绑定 `HMAC-SHA256(token, uri..":"..exp)` 签名并附 `exp`。
-4. 客户端访问 `/proxy/*` 时（**无需 token**）：
+6. 客户端访问 `/proxy/*` 时（**无需 token**）：
    - `access.gate()`：on 时执行 IP 白名单 + 固定窗口限流（`ngx.shared.rate_limit`）
    - `access.require_sig()`：on 时校验签名与过期时间；off 时放行
-5. nginx `proxy_pass` 转发到对应 DMM CDN，视频流关闭缓冲（支持拖动），图片按需转发。
-6. 容器启动时 `entrypoint.sh` 检测证书：证书存在则额外启用 HTTPS(443) server 块（`include dmm.d/ssl.conf`），否则仅监听 HTTP(80)。
+7. nginx `proxy_pass` 转发到对应 DMM CDN，视频流关闭缓冲（支持拖动），图片按需转发。
+8. 容器启动时 `entrypoint.sh` 检测证书：证书存在则额外启用 HTTPS(443) server 块（`include dmm.d/ssl.conf`），否则仅监听 HTTP(80)。
 
 ### 签名校验细节（`sign.lua`）
 
@@ -321,6 +455,38 @@ Authorization: Bearer <token>
 - **生产必备**：设置强 `DMM_AUTH_TOKEN`（`openssl rand -hex 32`），并用 `DMM_ALLOW_IPS` 收紧到可信来源；把 `DMM_API_PROTECT` 保持为 `on`
 - `DMM_API_PROTECT=off` 仅用于内网/调试环境——此时 `/proxy/*` 完全开放（无签名、无限流），链接一旦泄露可被任意转发
 - `/health` 无鉴权，不返回敏感信息，可安全暴露
+
+---
+
+## 前端界面
+
+访问 `http://localhost:80` 即可打开内置的 SPA 浏览界面。
+
+### 功能
+
+| 功能 | 说明 |
+|------|------|
+| **今日更新** | 7 天时间线选择器，点击日期查看当日上架作品 |
+| **热门排行** | 按 DMM 销量排名展示热门作品，含排名序号与收藏数 |
+| **卡片浏览** | 5 列网格布局，展示封面、标题、演员、商家、价格、评分 |
+| **图片预览** | 点击卡片弹出大图弹窗，依次展示封面 + 全部剧照，左右箭头 / 键盘 `←` `→` 切换，`Esc` 关闭 |
+| **配色主题** | 6 套小清新风格：薄荷绿 / 樱花粉 / 薰衣草 / 海洋蓝 / 暖杏色 / 夜猫黑，右上角 🎨 切换 |
+| **中英双语** | 右上角按钮切换中文 / English，偏好自动保存到 `localStorage` |
+| **分页** | 每页 30 条，支持翻页浏览 |
+| **Mock 降级** | API 不可用时自动使用内置 mock 数据，界面仍可正常浏览 |
+
+### Token 注入
+
+前端通过 `/config.js` 获取 API token（由 nginx Lua handler 从 `DMM_AUTH_TOKEN` 环境变量注入），无需在前端代码中硬编码密钥。前端调用 `/api/*` 时自动携带 `Authorization: Bearer <token>`。
+
+### 文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `static/index.html` | 单文件 SPA，包含 HTML / CSS / JS，零依赖 |
+| `/config.js` | 动态生成，返回 `window.__API_TOKEN__`（由 nginx Lua 注入） |
+
+> `static/` 通过 volume 挂载，修改后刷新浏览器即可，无需重建容器。
 
 ---
 

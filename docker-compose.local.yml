@@ -1,0 +1,46 @@
+# =============================================================================
+# DMM Proxy API - run from Docker Hub image (no local build)
+#
+# Usage:
+#   cp .env.example .env          # then edit .env (set DMM_AUTH_TOKEN)
+#   docker compose -f docker-compose.hub.yml up -d
+#
+# Requires a .env file (or exported env vars) with at least DMM_AUTH_TOKEN:
+#   DMM_AUTH_TOKEN=<your-bearer-token>   # required by ALL /api/* endpoints
+#
+# HTTPS (SSL) - OPTIONAL: put cert files into the host dir below (default ./certs)
+#   mkdir -p certs
+#   cp /path/to/fullchain.pem certs/fullchain.pem
+#   cp /path/to/private.key   certs/private.key
+#   docker compose -f docker-compose.hub.yml up -d
+# Entrypoint auto-detects them at startup: certs present -> 443 HTTPS enabled,
+# otherwise HTTP-only. Override host cert dir with: DMM_SSL_CERTS_DIR=/path
+#
+# DMM_API_PROTECT only controls whether /proxy/* needs a signature + rate-limit
+# + IP whitelist. ALL external interfaces (/api/* and /proxy/*) ALWAYS require
+# Authorization: Bearer <DMM_AUTH_TOKEN>, regardless of on/off.
+#   on  (default): /proxy/* needs Bearer token + a short-lived signed URL (sig+exp)
+#   off          : /proxy/* needs Bearer token only (no signature/limit)
+# =============================================================================
+
+version: "3.8"
+
+services:
+  dmm-proxy:
+    image: fireinrain/dmm-proxy-api:latest
+    container_name: dmm-proxy
+    ports:
+      - "${DMM_PROXY_PORT:-80}:80"
+      - "${DMM_PROXY_SSL_PORT:-443}:443"
+    environment:
+      - DMM_AUTH_TOKEN=${DMM_AUTH_TOKEN:-7966ddc9e82048fc7e03e5d8365954e8}
+      - DMM_API_PROTECT=${DMM_API_PROTECT:-on}
+      - DMM_SIGN_TTL=${DMM_SIGN_TTL:-220}
+      - DMM_RATE_PER_MIN=${DMM_RATE_PER_MIN:-240}
+      - DMM_ALLOW_IPS=${DMM_ALLOW_IPS:-}
+      - DMM_CERT_DIR=${DMM_CERT_DIR:-/etc/ssl/dmm}
+      - DMM_CERT_FILE=${DMM_CERT_FILE:-fullchain.pem}
+      - DMM_CERT_KEY=${DMM_CERT_KEY:-private.key}
+    volumes:
+      - ${DMM_SSL_CERTS_DIR:-/etc/ssl/api-dmmrsc.131433.xyz}:/etc/ssl/dmm:ro
+    restart: unless-stopped

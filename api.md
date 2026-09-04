@@ -69,6 +69,29 @@ GET /health
 
 ---
 
+## 1.1 前端配置（config.js）
+
+```
+GET /config.js
+```
+
+无需鉴权。由 nginx Lua handler 动态生成，将 `DMM_AUTH_TOKEN` 环境变量注入为前端可用的 JavaScript 变量。
+
+**响应 `200`**
+
+```javascript
+window.__API_TOKEN__ = 'your-dmm-auth-token-here';
+```
+
+| 响应头 | 值 |
+|--------|-----|
+| `Content-Type` | `application/javascript; charset=utf-8` |
+| `Cache-Control` | `no-store` |
+
+> 前端 `<script src="/config.js">` 加载后，通过 `window.__API_TOKEN__` 获取 token，调用 `/api/*` 时自动携带 `Authorization: Bearer <token>`。token 不会暴露在前端源码中。
+
+---
+
 ## 2. 封面 / 剧照信息
 
 ```
@@ -299,6 +322,224 @@ Authorization: Bearer <token>
 
 ---
 
+## 4.2 每日更新列表
+
+```
+GET /api/todayupdate
+```
+
+获取指定日期的 DMM 作品更新列表。不传 `date` 参数时默认获取**今日**（JST 时区）的数据。
+
+通过 DMM FANZA GraphQL API（`https://api.video.dmm.co.jp/graphql`）查询按 `deliveryStartDate` 排序的最新作品。
+
+**请求参数**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `date` | string | 否 | 日期，格式 `YYYY-MM-DD`，默认今日（JST） |
+| `limit` | int | 否 | 每页数量，仅允许 `30` / `60` / `120`，默认 `30` |
+| `offset` | int | 否 | 偏移量，用于分页，默认 `0` |
+
+**示例请求**
+
+```http
+# 获取今日更新
+GET http://localhost:8080/api/todayupdate
+Authorization: Bearer <token>
+
+# 获取指定日期，每页 120 条，第二页
+GET http://localhost:8080/api/todayupdate?date=2026-09-03&limit=120&offset=120
+Authorization: Bearer <token>
+```
+
+**示例响应 `200`**
+
+```json
+{
+  "date": "2026-09-03",
+  "total": 99,
+  "limit": 30,
+  "offset": 0,
+  "hasNext": true,
+  "count": 30,
+  "works": [
+    {
+      "id": "1fns00241",
+      "title": "雪国育ちの色白スレンダーBODYを性感開発する初イキッ3本番！ 柏木雫",
+      "cover": {
+        "medium": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/1fns00241/1fns00241ps.jpg",
+        "large": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/1fns00241/1fns00241pl.jpg"
+      },
+      "deliveryStartAt": "2026-09-03T00:00:59+09:00",
+      "actresses": [{ "id": "1112624", "name": "柏木雫" }],
+      "maker": { "id": "40488", "name": "FALENO" },
+      "isOnSale": true,
+      "review": { "average": 5, "count": 1 },
+      "releaseStatus": "LATEST_RELEASE",
+      "price": {
+        "productId": "1fns00241dl",
+        "price": 2480,
+        "discountPrice": null
+      },
+      "hasMultiplePrices": true,
+      "sampleMovie": {
+        "mp4": "https://cc3001.dmm.co.jp/pv/.../1fns002414k.mp4",
+        "hls": "https://cc3001.dmm.co.jp/pv/.../playlist.m3u8"
+      },
+      "sampleImages": [
+        { "number": 1, "largeUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/1fns00241/1fns00241jp-1.jpg" },
+        { "number": 2, "largeUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/1fns00241/1fns00241jp-2.jpg" }
+      ]
+    }
+  ]
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `date` | 查询的日期 |
+| `total` | 该日期的总作品数 |
+| `limit` | 当前分页大小 |
+| `offset` | 当前偏移量 |
+| `hasNext` | 是否有下一页 |
+| `count` | 当前返回的作品数 |
+| `works[].id` | DMM 产品 ID |
+| `works[].title` | 作品标题 |
+| `works[].cover.medium` | 中等尺寸封面直链 |
+| `works[].cover.large` | 大尺寸封面直链 |
+| `works[].deliveryStartAt` | 发布时间（ISO 8601，含时区） |
+| `works[].actresses` | 演员列表 `[{id, name}]` |
+| `works[].maker` | 制作商 `{id, name}` |
+| `works[].isOnSale` | 是否在售 |
+| `works[].review` | 评分 `{average, count}` |
+| `works[].releaseStatus` | 发布状态（如 `LATEST_RELEASE`） |
+| `works[].price` | 价格信息 `{productId, price, discountPrice}`，可能不存在 |
+| `works[].hasMultiplePrices` | 是否有多种价格版本 |
+| `works[].sampleMovie` | 预告片链接 `{mp4, hls}`，可能不存在 |
+| `works[].sampleImages` | 剧照列表 `[{number, largeUrl}]`，可能不存在 |
+
+**错误码**
+
+| 状态码 | 场景 |
+|--------|------|
+| `502` | 上游 DMM GraphQL API 请求失败 |
+| `400` | 缺少 Authorization 头 / token 无效 |
+
+---
+
+## 4.3 热门排行榜
+
+```
+GET /api/ranking
+```
+
+获取 DMM 热门作品排行榜，按销售排名分数（`SALES_RANK_SCORE`）排序。默认返回 30 条。
+
+通过 DMM FANZA GraphQL API 查询，与每日更新使用相同的上游接口但排序方式不同。
+
+**请求参数**
+
+| 参数 | 类型 | 必填 | 说明 |
+|------|------|------|------|
+| `limit` | int | 否 | 每页数量，仅允许 `30` / `60` / `120`，默认 `30` |
+| `offset` | int | 否 | 偏移量，用于分页，默认 `0` |
+
+**示例请求**
+
+```http
+# 默认热门 Top 30
+GET http://localhost:8080/api/ranking
+Authorization: Bearer <token>
+
+# 第二页（第 31-60 名）
+GET http://localhost:8080/api/ranking?limit=30&offset=30
+Authorization: Bearer <token>
+
+# 每页 120 条
+GET http://localhost:8080/api/ranking?limit=120
+Authorization: Bearer <token>
+```
+
+**示例响应 `200`**
+
+```json
+{
+  "total": 478397,
+  "limit": 30,
+  "offset": 0,
+  "hasNext": true,
+  "count": 30,
+  "works": [
+    {
+      "rank": 1,
+      "id": "sqte00683",
+      "title": "いつでも使えるオナホ後輩 花守夏歩",
+      "cover": {
+        "medium": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sqte00683/sqte00683ps.jpg",
+        "large": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sqte00683/sqte00683pl.jpg"
+      },
+      "deliveryStartAt": "2026-05-16T00:00:00+09:00",
+      "actresses": [{ "id": "1099813", "name": "花守夏歩" }],
+      "maker": { "id": "45414", "name": "S-Cute" },
+      "isOnSale": true,
+      "review": { "average": 4.94, "count": 32 },
+      "releaseStatus": "SEMI_NEW_RELEASE",
+      "bookmarkCount": 31336,
+      "price": {
+        "productId": "sqte00683",
+        "price": 580,
+        "discountPrice": 290
+      },
+      "hasMultiplePrices": true,
+      "sampleMovie": {
+        "mp4": "https://cc3001.dmm.co.jp/pv/.../sqte00683hhb.mp4",
+        "hls": "https://cc3001.dmm.co.jp/pv/.../playlist.m3u8"
+      },
+      "sampleImages": [
+        { "number": 1, "largeUrl": "https://awsimgsrc.dmm.co.jp/pics_dig/digital/video/sqte00683/sqte00683jp-1.jpg" }
+      ]
+    }
+  ]
+}
+```
+
+**响应字段**
+
+| 字段 | 说明 |
+|------|------|
+| `total` | 总作品数（排行榜全量） |
+| `limit` | 当前分页大小 |
+| `offset` | 当前偏移量 |
+| `hasNext` | 是否有下一页 |
+| `count` | 当前返回的作品数 |
+| `works[].rank` | 排名（从 1 开始，基于 offset + 序号） |
+| `works[].id` | DMM 产品 ID |
+| `works[].title` | 作品标题 |
+| `works[].cover.medium` | 中等尺寸封面直链 |
+| `works[].cover.large` | 大尺寸封面直链 |
+| `works[].deliveryStartAt` | 发布时间（ISO 8601，含时区） |
+| `works[].actresses` | 演员列表 `[{id, name}]` |
+| `works[].maker` | 制作商 `{id, name}` |
+| `works[].isOnSale` | 是否在售 |
+| `works[].review` | 评分 `{average, count}` |
+| `works[].releaseStatus` | 发布状态 |
+| `works[].bookmarkCount` | 收藏数（人气指标） |
+| `works[].price` | 价格信息 `{productId, price, discountPrice}`，可能不存在 |
+| `works[].hasMultiplePrices` | 是否有多种价格版本 |
+| `works[].sampleMovie` | 预告片链接 `{mp4, hls}`，可能不存在 |
+| `works[].sampleImages` | 剧照列表 `[{number, largeUrl}]`，可能不存在 |
+
+**错误码**
+
+| 状态码 | 场景 |
+|--------|------|
+| `502` | 上游 DMM GraphQL API 请求失败 |
+| `400` | 缺少 Authorization 头 / token 无效 |
+
+---
+
 ## 5. 封面图片代理
 
 ```
@@ -361,3 +602,39 @@ GET /proxy/video/litevideo/freepv/s/ssi/ssis00497/ssis00497_mhb_w.mp4
 { "error": "unauthorized", "message": "Missing Authorization header. Use: Authorization: Bearer <token>" }   // 401
 { "error": "forbidden", "message": "Invalid token" }                                                         // 403
 ```
+
+---
+
+## 前端界面
+
+访问 `http://localhost:80` 打开内置 SPA 浏览界面。前端通过 `/config.js` 获取 token 后自动调用 `/api/todayupdate` 和 `/api/ranking` 接口获取数据。
+
+### 功能
+
+- **今日更新**：7 天时间线选择器 + 卡片网格浏览
+- **热门排行**：销量排名展示，含排名序号与收藏数
+- **图片预览**：点击卡片弹出大图弹窗，封面 + 剧照轮播，键盘 `←` `→` / `Esc` 导航
+- **配色主题**：6 套小清新风格一键切换（薄荷绿 / 樱花粉 / 薰衣草 / 海洋蓝 / 暖杏色 / 夜猫黑）
+- **中英双语**：界面语言一键切换
+- **Mock 降级**：API 不可用时自动使用内置 mock 数据
+
+### 前端调用的接口
+
+| 接口 | 用途 | 鉴权 |
+|------|------|------|
+| `GET /config.js` | 获取 API token | 无需 |
+| `GET /api/todayupdate?date=YYYY-MM-DD&offset=0&limit=30` | 今日更新列表 | `Bearer <token>` |
+| `GET /api/ranking?offset=0&limit=30` | 热门排行榜 | `Bearer <token>` |
+
+### 字段映射（API → 前端）
+
+| API 字段 | 前端用途 |
+|----------|----------|
+| `cover.medium / cover.large` | 卡片封面图 |
+| `sampleImages[].largeUrl` | 弹窗图片列表（封面 + 全部剧照） |
+| `price.price / price.discountPrice` | 卡片价格显示（円） |
+| `actresses[].name` | 卡片演员标签 |
+| `maker.name` | 卡片商家标签 |
+| `bookmarkCount` | 排行榜收藏数（♥ N） |
+| `rank` (offset + i) | 排行榜排名（#N） |
+| `hasNext / total / offset / limit` | 分页控制 |

@@ -22,6 +22,22 @@ Authorization: Bearer {{token}}
 GET {{host}}/api/film_sample/snos-213
 Authorization: Bearer {{token}}
 
+### 2.2 每日更新列表（始终需 token；无参数=今日，?date=YYYY-MM-DD 指定日期）
+GET {{host}}/api/todayupdate
+Authorization: Bearer {{token}}
+
+### 2.3 每日更新列表 - 指定日期 + 分页
+GET {{host}}/api/todayupdate?date=2026-09-03&limit=60&offset=0
+Authorization: Bearer {{token}}
+
+### 2.4 热门排行榜（始终需 token；默认返回 30 条；支持 limit=30/60/120, offset 分页）
+GET {{host}}/api/ranking
+Authorization: Bearer {{token}}
+
+### 2.5 热门排行榜 - 分页
+GET {{host}}/api/ranking?limit=60&offset=30
+Authorization: Bearer {{token}}
+
 ### 3. 预告片信息（始终需 token；返回的 proxy 在 on 时为签名 URL）
 GET {{host}}/api/trailer/SNOS-213
 Authorization: Bearer {{token}}

@@ -91,4 +91,14 @@ function _M.handle_film_sample()
     film_sample.handle(id)
 end
 
+function _M.handle_todayupdate()
+    local todayupdate = require "api_todayupdate"
+    todayupdate.handle()
+end
+
+function _M.handle_ranking()
+    local ranking = require "api_ranking"
+    ranking.handle()
+end
+
 return _M
