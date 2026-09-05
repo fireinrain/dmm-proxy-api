@@ -710,14 +710,14 @@
     inset: 0;
     z-index: 1000;
     background: rgba(245,247,250,0.96);
-    display: flex;
+    display: none;
     align-items: center;
     justify-content: center;
     padding: 20px;
     backdrop-filter: blur(6px);
   }
-  .gate-overlay.hidden {
-    display: none;
+  .gate-overlay.open {
+    display: flex;
   }
   .gate-box {
     background: var(--card-bg);
@@ -1560,7 +1560,7 @@ function confirmGate() {
   if (document.getElementById('gate-remember').checked) {
     localStorage.setItem('dm9_age_ok', '1');
   }
-  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('gate').classList.remove('open');
   document.body.classList.remove('gated');
   initApp();
 }
@@ -1572,10 +1572,10 @@ function leaveGate() {
 function checkGate() {
   const already = localStorage.getItem('dm9_age_ok') === '1';
   if (already) {
-    document.getElementById('gate').classList.add('hidden');
     document.body.classList.remove('gated');
     initApp();
   } else {
+    document.getElementById('gate').classList.add('open');
     document.documentElement.style.overflow = 'hidden';
   }
 }
