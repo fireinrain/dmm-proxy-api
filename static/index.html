@@ -412,6 +412,39 @@
     display: block;
     cursor: zoom-in;
   }
+  /* ---- gacha browse mode: blur covers + reveal effect ---- */
+  body.browse-gacha .card {
+    position: relative;
+    cursor: pointer;
+  }
+  body.browse-gacha .card-img {
+    filter: blur(26px) saturate(1.15);
+    transform: scale(1.08);
+    transition: filter .5s ease, transform .5s ease;
+  }
+  body.browse-gacha .card.revealed .card-img {
+    animation: gachaFlip .8s ease forwards;
+  }
+  @keyframes gachaFlip {
+    0%   { transform: perspective(800px) rotateY(0deg)   scale(1.08); filter: blur(26px) saturate(1.15); }
+    30%  { transform: perspective(800px) rotateY(60deg)  scale(1.12); filter: blur(18px) saturate(1.3); }
+    55%  { transform: perspective(800px) rotateY(110deg) scale(1.06); filter: blur(10px) saturate(1.2); }
+    100% { transform: perspective(800px) rotateY(360deg) scale(1);    filter: none; }
+  }
+  body.browse-gacha .card.revealed::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 42%, rgba(255,235,160,.6) 50%, transparent 58%);
+    animation: cardShine .8s ease forwards;
+  }
+  @keyframes cardShine {
+    0%  { transform: translateX(-80%); opacity: 1; }
+    70% { transform: translateX(80%);  opacity: 1; }
+    100%{ transform: translateX(80%);  opacity: 0; }
+  }
   .card-body {
     padding: 14px 16px 16px;
   }
@@ -526,14 +559,14 @@
 
   /* ---- footer / copyright ---- */
   .site-footer {
-    position: fixed;
-    right: 16px;
-    bottom: 10px;
+    float: right;
+    margin: -6px 16px 24px 0;
     font-size: 11px;
     color: var(--text-light);
     opacity: .8;
     z-index: 5;
     user-select: none;
+    clear: both;
   }
 
   /* ---- fade in ---- */
@@ -801,9 +834,8 @@
     .modal-footer { padding: 10px 14px; flex-wrap: wrap; }
     .modal-badge { display: none; }
     .site-footer {
-      position: static;
-      text-align: center;
-      padding: 4px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+      text-align: right;
+      margin: 0 14px calc(12px + env(safe-area-inset-bottom, 0px)) 0;
     }
   }
   @media (max-width: 380px) {
@@ -824,12 +856,16 @@
   }
 </style>
 </head>
-<body>
+<body class="gated">
 
 <div class="header">
   <h1 data-i18n="title">DMM Daily Updates</h1>
   <p id="header-sub" data-i18n="subtitle_today">Daily new releases timeline</p>
   <div class="settings-bar">
+<button class="settings-btn" id="btn-browse" onclick="toggleBrowseMode()" title="浏览模式">
+      <span class="icon" id="browse-icon">👀</span>
+      <span id="browse-label">随便看</span>
+    </button>
     <div class="theme-picker">
       <button class="settings-btn" id="btn-theme" onclick="toggleThemeDropdown()">
         <span class="icon">🎨</span>
@@ -968,6 +1004,7 @@ const I18N = {
 };
 let currentLang = localStorage.getItem('lang') || 'zh';
 let currentTheme = localStorage.getItem('theme') || 'mint';
+let currentBrowse = localStorage.getItem('browse') || 'browse';
 
 const THEMES = [
   { id: 'mint',     name_zh: '薄荷绿',  name_en: 'Mint',     color: '#6b9e8a' },
@@ -1032,6 +1069,36 @@ function setTheme(id) {
 
 function toggleThemeDropdown() {
   document.getElementById('theme-dropdown').classList.toggle('open');
+}
+
+// ========== Browse Mode (browse / gacha) ==========
+function applyBrowse() {
+  const gacha = currentBrowse === 'gacha';
+  document.body.classList.toggle('browse-gacha', gacha);
+  document.getElementById('btn-browse').classList.toggle('active', gacha);
+  document.getElementById('browse-label').textContent = gacha ? '我抽卡' : '随便看';
+  document.getElementById('browse-icon').textContent = gacha ? '🎰' : '👀';
+}
+
+function toggleBrowseMode() {
+  currentBrowse = currentBrowse === 'gacha' ? 'browse' : 'gacha';
+  localStorage.setItem('browse', currentBrowse);
+  applyBrowse();
+  resetGachaCards();
+}
+
+function handleCardClick(card, payload) {
+  if (currentBrowse === 'gacha' && !card.classList.contains('revealed')) {
+    card.classList.add('revealed');
+    return;
+  }
+  openModal(payload);
+}
+
+function resetGachaCards() {
+  document.querySelectorAll('#cards .card').forEach(card => {
+    card.classList.remove('revealed');
+  });
 }
 
 document.addEventListener('click', e => {
@@ -1360,9 +1427,9 @@ function renderCards(data) {
     const codeHtml = code ? `<span class="card-id">${escHtml(code)}</span>` : '';
     const dateHtml = w.deliveryStartAt ? `<span class="card-date">${escHtml(fmtRelease(w.deliveryStartAt))}</span>` : '';
     return `
-      <div class="card fade-in" style="animation-delay:${i*30}ms">
+      <div class="card fade-in" style="animation-delay:${i*30}ms"
+        onclick="handleCardClick(this, ${escAttr(JSON.stringify({images:w.images||[],title:w.title,code,date:fmtRelease(w.deliveryStartAt)}))})">
         <img class="card-img" src="${w.cover.medium || w.cover.large || ''}" alt="${escAttr(w.title || '')}" loading="lazy"
-          onclick='openModal(${escAttr(JSON.stringify({images:w.images||[],title:w.title,code,date:fmtRelease(w.deliveryStartAt)}))})'
           onerror="this.style.background='linear-gradient(135deg,var(--border),var(--border))'">
         <div class="card-body">
           ${rankHtml}
@@ -1509,7 +1576,6 @@ function checkGate() {
     document.body.classList.remove('gated');
     initApp();
   } else {
-    document.body.classList.add('gated');
     document.documentElement.style.overflow = 'hidden';
   }
 }
@@ -1520,6 +1586,7 @@ function initApp() {
   document.getElementById('calendar-input').max = TODAY;
   renderTimeline();
   applyTheme();
+  applyBrowse();
   applyLang();
   initDrag();
   loadTodayData();
