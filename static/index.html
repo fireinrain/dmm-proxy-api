@@ -762,6 +762,66 @@
     color: var(--text-light);
     cursor: pointer;
   }
+
+  /* ================= responsive ================= */
+  @media (max-width: 1200px) {
+    .cards { grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  }
+  @media (max-width: 992px) {
+    .cards { grid-template-columns: repeat(3, 1fr); }
+    .timeline-wrap { padding: 0 48px; }
+  }
+  @media (max-width: 700px) {
+    .cards { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .content {
+      padding: 20px 14px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+    .content-title { font-size: 15px; }
+    .header { padding: 20px 14px 0; }
+    .header h1 { font-size: 18px; }
+    .header p { font-size: 12px; }
+    .settings-bar { top: 14px; right: 14px; gap: 4px; }
+    .settings-btn { padding: 5px 10px; font-size: 11px; }
+    .mode-btn { padding: 6px 16px; font-size: 12px; }
+    .timeline-wrap { padding: 0 14px; }
+    .timeline-track { padding: 6px 2px 10px; }
+    .timeline-day { flex-basis: 46px; }
+    .timeline-date { font-size: 12px; }
+    .calendar-btn { right: 6px; width: 30px; height: 30px; font-size: 14px; }
+    .calendar-input { right: 6px; }
+    .card-body { padding: 10px 12px 12px; }
+    .card-title { font-size: 13px; -webkit-line-clamp: 2; }
+    .card-price { font-size: 11px; margin-top: 4px; }
+    .pagination { flex-wrap: wrap; margin-top: 22px; }
+    .modal-box { width: 96vw; max-height: 96vh; }
+    .modal-arrow { width: 34px; height: 34px; font-size: 16px; }
+    .modal-arrow.left  { left: 6px; }
+    .modal-arrow.right { right: 6px; }
+    .modal-close { top: 8px; right: 10px; width: 32px; height: 32px; }
+    .modal-footer { padding: 10px 14px; flex-wrap: wrap; }
+    .modal-badge { display: none; }
+    .site-footer {
+      position: static;
+      text-align: center;
+      padding: 4px 14px calc(12px + env(safe-area-inset-bottom, 0px));
+    }
+  }
+  @media (max-width: 380px) {
+    .cards { grid-template-columns: repeat(1, 1fr); gap: 14px; }
+    .settings-bar { top: 12px; right: 10px; }
+    .header h1 { font-size: 16px; letter-spacing: 0.5px; }
+  }
+  @media (max-height: 520px) {
+    .modal-img { max-height: 72vh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -1033,6 +1093,7 @@ const MOCK_TITLES = [
 function mockImages(id) {
   const imgs = [];
   imgs.push({ type:'cover', url: `${AWS}/${id}/${id}pl.jpg` });
+  imgs.push({ type:'cover', url: `${AWS}/${id}/${id}ps.jpg` });
   for (let n = 1; n <= 10; n++) {
     imgs.push({ type:'sample', url: `${AWS}/${id}/${id}jp-${n}.jpg` });
   }
@@ -1095,6 +1156,9 @@ function mapWork(w) {
   const images = [];
   if (w.cover && w.cover.large) {
     images.push({ type: 'cover', url: w.cover.large });
+  }
+  if (w.cover && w.cover.medium) {
+    images.push({ type: 'cover', url: w.cover.medium });
   }
   if (w.sampleImages && w.sampleImages.length) {
     w.sampleImages.forEach(s => {
