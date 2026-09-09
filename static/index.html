@@ -1959,6 +1959,7 @@ const I18N = {
     search_place: '输入番号',
     search_title: '搜索 %s',
     search_empty: '请输入番号',
+    search_invalid: '番号格式不正确，应为字母+数字（如 ABP-477、ABF365、200GANA-2359）',
     searchrank: '热门搜索 Top 20',
     searchrank_sub: '共有 %d 个不同番号搜索记录',
     searchrank_count: '搜索 %d 次',
@@ -2052,6 +2053,7 @@ const I18N = {
     search_place: 'Enter a code',
     search_title: 'Search %s',
     search_empty: 'Please enter a code',
+    search_invalid: 'Invalid code format. Use letters + digits (e.g. ABP-477, ABF365, 200GANA-2359)',
     searchrank: 'Top 20 Searches',
     searchrank_sub: '%d distinct codes searched',
     searchrank_count: 'searched %d×',
@@ -3890,12 +3892,39 @@ function runSearch() {
     input.focus();
     return;
   }
+  if (!isValidCode(val)) {
+    currentMode = 'search';
+    currentPage = 0;
+    invalidatePendingRequests();
+    currentSearch = '';
+    enterSearchMode();
+    renderSearchInvalid();
+    input.focus();
+    input.select();
+    return;
+  }
   currentMode = 'search';
   currentPage = 0;
   currentSearch = val;
   enterSearchMode();
   loadSearchData();
   updateHash();
+}
+
+// A valid 番号 is made of letters and digits with at most one hyphen:
+//   letters+digits (ABF365 / SIRO5665)      letters-digits (ABP-477)
+//   digits+letters+digits (123ABC456)       digits+letters-digits (200GANA-2359)
+const VALID_CODE_RE = /^([A-Z]+-?\d+|\d+[A-Z]+-?\d+)$/;
+function isValidCode(v) {
+  return VALID_CODE_RE.test(v);
+}
+
+function renderSearchInvalid() {
+  const container = document.getElementById('cards');
+  document.getElementById('content-title').textContent = '';
+  document.getElementById('content-count').textContent = '';
+  container.innerHTML = `<div class="status-msg">${t('search_invalid')}</div>`;
+  document.getElementById('pagination').innerHTML = '';
 }
 
 function runSearchByCode(code) {
