@@ -1268,8 +1268,8 @@
     position: absolute;
     top: 0;
     left: 0;
-    width: 190px;
-    height: 190px;
+    width: 200px;
+    height: 200px;
     border-radius: 50%;
     border: 2px solid rgba(255, 255, 255, .85);
     box-shadow: 0 8px 28px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .12);
@@ -2912,7 +2912,16 @@ document.addEventListener('keydown', e => {
 // CSS background-image loupe: reuses the already-loaded sample/cover image so
 // no extra download, no CORS taint, and sub-pixel precision. Follows the mouse
 // inside the *painted* area under `object-fit: contain` (letterbox bars hide it).
-const LOUPE_SIZE = 190;
+const LOUPE_BASE = 200;
+const LOUPE_MIN = 120;
+// Resizes the lens to the wrap on smaller screens so it never overwhelms the image.
+function loupeSize() {
+  const wrap = document.getElementById('modal-img-wrap');
+  const w = wrap ? wrap.clientWidth : 0;
+  const h = wrap ? wrap.clientHeight : 0;
+  if (!w || !h) return LOUPE_BASE;
+  return Math.max(LOUPE_MIN, Math.min(LOUPE_BASE, Math.round(Math.min(w, h) * 0.45)));
+}
 const LOUPE_ZOOM = 2.5;
 
 function loupeHide() {
@@ -2943,11 +2952,14 @@ function loupeMove(e) {
   if (mx < 0 || my < 0 || mx > pw || my > ph) { loupeHide(); return; }
 
   lens.classList.add('on');
+  const size = loupeSize();
   const wr = wrap.getBoundingClientRect();
-  lens.style.left = (e.clientX - wr.left - LOUPE_SIZE / 2) + 'px';
-  lens.style.top = (e.clientY - wr.top - LOUPE_SIZE / 2) + 'px';
+  lens.style.width = size + 'px';
+  lens.style.height = size + 'px';
+  lens.style.left = (e.clientX - wr.left - size / 2) + 'px';
+  lens.style.top = (e.clientY - wr.top - size / 2) + 'px';
   lens.style.backgroundSize = (pw * LOUPE_ZOOM) + 'px ' + (ph * LOUPE_ZOOM) + 'px';
-  lens.style.backgroundPosition = (-(mx * LOUPE_ZOOM - LOUPE_SIZE / 2)) + 'px ' + (-(my * LOUPE_ZOOM - LOUPE_SIZE / 2)) + 'px';
+  lens.style.backgroundPosition = (-(mx * LOUPE_ZOOM - size / 2)) + 'px ' + (-(my * LOUPE_ZOOM - size / 2)) + 'px';
 }
 
 (function loupeBind() {
