@@ -1263,6 +1263,23 @@
     user-select: none;
     -webkit-user-drag: none;
   }
+  .modal-img-wrap { cursor: zoom-in; }
+  .modal-loupe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 190px;
+    height: 190px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, .85);
+    box-shadow: 0 8px 28px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .12);
+    background-repeat: no-repeat;
+    background-position: 0 0;
+    pointer-events: none;
+    display: none;
+    z-index: 6;
+  }
+  .modal-loupe.on { display: block; }
   .modal-arrow {
     position: absolute;
     top: 50%;
@@ -1888,8 +1905,9 @@
     <button class="modal-close" onclick="closeModal()">&times;</button>
     <button class="modal-arrow left" onclick="modalPrev()">&#8249;</button>
     <button class="modal-arrow right" onclick="modalNext()">&#8250;</button>
-    <div class="modal-img-wrap">
+    <div class="modal-img-wrap" id="modal-img-wrap">
       <img class="modal-img" id="modal-img" src="" alt="">
+      <div class="modal-loupe" id="modal-loupe"></div>
     </div>
     <div class="modal-footer">
       <span class="modal-counter" id="modal-counter">1 / 1</span>
@@ -2874,6 +2892,7 @@ function modalNext() {
   if (modalIdx < modalImages.length - 1) { modalIdx++; updateModal(); }
 }
 function updateModal() {
+  loupeHide();
   const img = modalImages[modalIdx];
   document.getElementById('modal-img').src = img ? img.url : '';
   document.getElementById('modal-counter').textContent = `${modalIdx + 1} / ${modalImages.length}`;
@@ -2888,6 +2907,55 @@ document.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') modalPrev();
   if (e.key === 'ArrowRight') modalNext();
 });
+
+// ========== Modal Loupe (magnifier) ==========
+// CSS background-image loupe: reuses the already-loaded sample/cover image so
+// no extra download, no CORS taint, and sub-pixel precision. Follows the mouse
+// inside the *painted* area under `object-fit: contain` (letterbox bars hide it).
+const LOUPE_SIZE = 190;
+const LOUPE_ZOOM = 2.5;
+
+function loupeHide() {
+  const lens = document.getElementById('modal-loupe');
+  if (lens) lens.classList.remove('on');
+}
+
+function loupeMove(e) {
+  const wrap = document.getElementById('modal-img-wrap');
+  const img = document.getElementById('modal-img');
+  const lens = document.getElementById('modal-loupe');
+  if (!wrap || !img || !lens || !img.src || !img.naturalWidth) { loupeHide(); return; }
+
+  const src = img.src;
+  if (lens.style.backgroundImage !== `url("${src}")`) {
+    lens.style.backgroundImage = `url("${src}")`;
+  }
+
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const r = img.getBoundingClientRect();
+  const scale = Math.min(r.width / iw, r.height / ih);
+  const pw = iw * scale, ph = ih * scale;
+  const ox = r.left + (r.width - pw) / 2;
+  const oy = r.top + (r.height - ph) / 2;
+
+  const mx = e.clientX - ox;
+  const my = e.clientY - oy;
+  if (mx < 0 || my < 0 || mx > pw || my > ph) { loupeHide(); return; }
+
+  lens.classList.add('on');
+  const wr = wrap.getBoundingClientRect();
+  lens.style.left = (e.clientX - wr.left - LOUPE_SIZE / 2) + 'px';
+  lens.style.top = (e.clientY - wr.top - LOUPE_SIZE / 2) + 'px';
+  lens.style.backgroundSize = (pw * LOUPE_ZOOM) + 'px ' + (ph * LOUPE_ZOOM) + 'px';
+  lens.style.backgroundPosition = (-(mx * LOUPE_ZOOM - LOUPE_SIZE / 2)) + 'px ' + (-(my * LOUPE_ZOOM - LOUPE_SIZE / 2)) + 'px';
+}
+
+(function loupeBind() {
+  const wrap = document.getElementById('modal-img-wrap');
+  if (!wrap) return;
+  wrap.addEventListener('mousemove', loupeMove);
+  wrap.addEventListener('mouseleave', loupeHide);
+})();
 
 // ========== Modal Action Buttons (Magnet / Findplay) ==========
 let currentCode = '';
